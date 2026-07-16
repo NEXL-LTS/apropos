@@ -96,6 +96,27 @@ describe Muninn::Convention do
     end
   end
 
+  describe "#verify" do
+    it "harvests the section under a `## Verify` heading up to the next heading" do
+      text = "---\npaths: [\"src/**\"]\n---\n# Rule\n\nBody.\n\n## Verify\n\n- one\n- two\n\n## Notes\n\nignored\n"
+      Muninn::Convention.parse("docs/conventions/a.md", text).verify.should eq("- one\n- two")
+    end
+
+    it "harvests to end of doc when no heading follows" do
+      text = "---\npaths: [\"src/**\"]\n---\nBody.\n\n## Verify\n\nCheck it works.\n"
+      Muninn::Convention.parse("docs/conventions/a.md", text).verify.should eq("Check it works.")
+    end
+
+    it "is nil when there is no Verify heading" do
+      convention(%(paths: ["src/**"])).verify.should be_nil
+    end
+
+    it "is nil when the Verify section is empty" do
+      text = "---\npaths: [\"src/**\"]\n---\nBody.\n\n## Verify\n\n## Next\n\nx\n"
+      Muninn::Convention.parse("docs/conventions/a.md", text).verify.should be_nil
+    end
+  end
+
   describe "#triggers_for_content?" do
     it "does not fire for a Layer 2 doc" do
       convention(%(paths: ["src/**"])).triggers_for_content?("src/x.cr", "code").should be_false

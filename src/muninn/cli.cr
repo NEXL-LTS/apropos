@@ -1,6 +1,8 @@
 require "./version"
 require "./generate"
 require "./hook"
+require "./review"
+require "./git"
 require "./repo_root"
 require "./filesystem"
 
@@ -51,6 +53,10 @@ module Muninn
         handle_generate(args[1..])
       when "hook"
         handle_hook(args[1..])
+      when "match"
+        handle_match(args[1..])
+      when "review"
+        handle_review(args[1..])
       else
         @stderr.puts "muninn: unknown command '#{args.first}'. Run `muninn --help`."
         1
@@ -123,6 +129,128 @@ module Muninn
     private def repo_root_override(args : Array(String)) : String?
       index = args.index("--repo-root")
       index ? args[index + 1]? : nil
+    end
+
+    # Mutable holder for parsed `match` options, so the parse loop and the
+    # post-parse validation stay small, independently testable methods.
+    private class MatchArgs
+      property format = "paths"
+      property? stdin_content = false
+      property override : String? = nil
+      getter paths = [] of String
+    end
+
+    # `muninn match [--format paths|json|full] [--stdin-content] <path> [...]`
+    # (PRD §5.6). A review/CI command: fails *closed* on a bad option or a
+    # malformed doc.
+    private def handle_match(args : Array(String)) : Int32
+      opts = MatchArgs.new
+      if code = parse_match_args(args, opts)
+        return code
+      end
+      if code = validate_match(opts)
+        return code
+      end
+
+      root = resolve_repo_root(opts.override)
+      return repo_root_error("match") if root.nil?
+
+      content = opts.stdin_content? ? @stdin.gets_to_end : nil
+      Review.match(root, Filesystem::Real.new, opts.paths, opts.format, content, @stdout, @stderr)
+    end
+
+    # Parse `match` args into `opts`; returns a non-nil exit code on a bad option.
+    private def parse_match_args(args : Array(String), opts : MatchArgs) : Int32?
+      index = 0
+      while index < args.size
+        case arg = args[index]
+        when "--format"
+          index += 1
+          value = args[index]?
+          return match_error("--format requires a value") if value.nil?
+          opts.format = value
+        when "--stdin-content"
+          opts.stdin_content = true
+        when "--repo-root"
+          index += 1
+          value = args[index]?
+          return match_error("--repo-root requires a directory") if value.nil?
+          opts.override = value
+        else
+          return match_error("unknown option '#{arg}'") if arg.starts_with?("--")
+          opts.paths << arg
+        end
+        index += 1
+      end
+      nil
+    end
+
+    private def validate_match(opts : MatchArgs) : Int32?
+      return match_error("expected at least one path") if opts.paths.empty?
+      unless MATCH_FORMATS.includes?(opts.format)
+        return match_error("unknown --format '#{opts.format}' (paths|json|full)")
+      end
+      if opts.stdin_content? && opts.paths.size != 1
+        return match_error("--stdin-content takes exactly one path")
+      end
+      nil
+    end
+
+    # `muninn review [--format md|json] [<git-range>]` (PRD §5.6). Fails *closed*.
+    private def handle_review(args : Array(String)) : Int32
+      format = "md"
+      override : String? = nil
+      range : String? = nil
+
+      index = 0
+      while index < args.size
+        case arg = args[index]
+        when "--format"
+          index += 1
+          value = args[index]?
+          return review_error("--format requires a value") if value.nil?
+          format = value
+        when "--repo-root"
+          index += 1
+          value = args[index]?
+          return review_error("--repo-root requires a directory") if value.nil?
+          override = value
+        else
+          return review_error("unknown option '#{arg}'") if arg.starts_with?("--")
+          return review_error("only one git range may be given") unless range.nil?
+          range = arg
+        end
+        index += 1
+      end
+
+      return review_error("unknown --format '#{format}' (md|json)") unless REVIEW_FORMATS.includes?(format)
+
+      root = resolve_repo_root(override)
+      return repo_root_error("review") if root.nil?
+
+      Review.run(root, Filesystem::Real.new, Git::Real.new, range, format, @stdout, @stderr)
+    end
+
+    MATCH_FORMATS  = {"paths", "json", "full"}
+    REVIEW_FORMATS = {"md", "json"}
+
+    private def resolve_repo_root(override : String?) : Path?
+      override ? Path[override] : Muninn.find_repo_root(Path[Dir.current])
+    end
+
+    private def repo_root_error(command : String) : Int32
+      @stderr.puts "muninn #{command}: no repository root found (looked for .git). Pass --repo-root."
+      1
+    end
+
+    private def match_error(message : String) : Int32
+      @stderr.puts "muninn match: #{message}"
+      1
+    end
+
+    private def review_error(message : String) : Int32
+      @stderr.puts "muninn review: #{message}"
+      1
     end
   end
 end

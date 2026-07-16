@@ -6,6 +6,7 @@ require "./matcher"
 require "./session_state"
 require "./filesystem"
 require "./repo_root"
+require "./rendering"
 require "./hooks/payload"
 
 module Muninn
@@ -23,8 +24,6 @@ module Muninn
   module Hook
     extend self
 
-    CHAR_CAP       = 10_000
-    SEPARATOR      = "\n\n---\n\n"
     INDEX_RELATIVE = Path[".cache", "muninn", "index.json"]
     LOG_RELATIVE   = Path[".cache", "muninn", "log"]
 
@@ -138,9 +137,8 @@ module Muninn
       # index even when the cache dir is unwritable.
     end
 
-    # Concatenate the matched rule bodies under `Convention (path):` headers.
-    # Over the 10k cap, fall back to headers + first paragraph + a read-the-file
-    # instruction rather than spilling (PRD §5.4).
+    # Read each matched rule's body (frontmatter stripped) and render them under
+    # `Convention (path):` headers, applying the shared cap strategy (PRD §5.4).
     private def build_context(root : Path, fs : Filesystem, entries : Array(Index::Entry)) : String
       docs = entries.compact_map do |entry|
         text = fs.read?(root.join(entry.path).to_s)
@@ -148,23 +146,7 @@ module Muninn
         _, body = Frontmatter.split(text)
         {entry.path, body.strip}
       end
-      return "" if docs.empty?
-
-      full = docs.map { |(path, body)| "Convention (#{path}):\n\n#{body}" }.join(SEPARATOR)
-      full.size <= CHAR_CAP ? full : summarized(docs)
-    end
-
-    private def summarized(docs : Array({String, String})) : String
-      header = "Several conventions matched but were summarized to fit the context budget; " \
-               "read the cited files for the full text.\n\n"
-      blocks = docs.map do |(path, body)|
-        "Convention (#{path}): #{first_paragraph(body)}\n(Read the full rule in #{path}.)"
-      end
-      header + blocks.join(SEPARATOR)
-    end
-
-    private def first_paragraph(body : String) : String
-      body.split("\n\n", 2).first.strip
+      Rendering.context(docs)
     end
 
     private def emit(stdout : IO, event_name : String, context : String) : Nil

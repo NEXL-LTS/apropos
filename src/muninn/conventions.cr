@@ -42,6 +42,26 @@ module Muninn
       frontmatter.skill?
     end
 
+    # The text under an optional `## Verify` heading in the body (PRD §5.2),
+    # harvested by `review` as checklist criteria. The section runs until the next
+    # heading (any level) or end of doc. Returns nil when absent or empty.
+    def verify : String?
+      capturing = false
+      captured = [] of String
+      body.each_line do |line|
+        if capturing
+          break if line.starts_with?('#')
+          captured << line
+        elsif line.strip == "## Verify"
+          capturing = true
+        end
+      end
+      return nil unless capturing
+
+      text = captured.join('\n').strip
+      text.empty? ? nil : text
+    end
+
     # Reference-only: reachable by link, never triggered (PRD §5.2).
     def reference_only? : Bool
       !layer2? && !layer3? && !skill?

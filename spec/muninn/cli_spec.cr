@@ -33,6 +33,34 @@ private def in_dir(dir : String, &)
   end
 end
 
+private def git_cmd(dir : String, args : Array(String)) : Nil
+  status = Process.run("git", args, chdir: dir,
+    output: Process::Redirect::Close, error: Process::Redirect::Close)
+  raise "git #{args.join(' ')} failed" unless status.success?
+end
+
+# A real git repo with one Layer 2 doc, an initial commit on `main`, and a
+# feature commit that edits a `src/**` file — so `review` has a range to resolve.
+private def with_git_repo(&)
+  dir = File.tempname("muninn-cli-review")
+  begin
+    Dir.mkdir_p(File.join(dir, "docs/conventions"))
+    Dir.mkdir_p(File.join(dir, "src"))
+    File.write(File.join(dir, "docs/conventions/a.md"), "---\npaths: [\"src/**\"]\n---\nA\n")
+    File.write(File.join(dir, "src/x.cr"), "one\n")
+    git_cmd(dir, ["init", "-b", "main"])
+    git_cmd(dir, ["add", "-A"])
+    git_cmd(dir, ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "init"])
+    git_cmd(dir, ["checkout", "-b", "feature"])
+    File.write(File.join(dir, "src/x.cr"), "one\ntwo\n")
+    git_cmd(dir, ["add", "-A"])
+    git_cmd(dir, ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "change"])
+    yield dir
+  ensure
+    FileUtils.rm_rf(dir)
+  end
+end
+
 describe Muninn::CLI do
   describe "help" do
     it "prints usage and exits 0 with no args" do
@@ -157,6 +185,136 @@ describe Muninn::CLI do
       code.should eq(0)
       out.should be_empty
       err.should be_empty
+    end
+  end
+
+  describe "match" do
+    it "prints matching rule files for a path (default format)" do
+      with_fixture_repo do |dir|
+        code, out, err = run(["match", "--repo-root", dir, "src/x.cr"])
+        code.should eq(0)
+        err.should be_empty
+        out.should eq("docs/conventions/a.md\n")
+      end
+    end
+
+    it "supports json and full formats" do
+      with_fixture_repo do |dir|
+        _, json, _ = run(["match", "--format", "json", "--repo-root", dir, "src/x.cr"])
+        json.should contain(%("path": "docs/conventions/a.md"))
+        _, full, _ = run(["match", "--format", "full", "--repo-root", dir, "src/x.cr"])
+        full.should contain("Convention (docs/conventions/a.md):")
+      end
+    end
+
+    it "reads content from stdin with --stdin-content" do
+      with_fixture_repo do |dir|
+        code, out, _ = run(["match", "--stdin-content", "--repo-root", dir, "src/x.cr"], stdin: "code")
+        code.should eq(0)
+        out.should contain("docs/conventions/a.md")
+      end
+    end
+
+    it "requires at least one path" do
+      code, _, err = run(["match", "--repo-root", "/tmp"])
+      code.should eq(1)
+      err.should contain("expected at least one path")
+    end
+
+    it "rejects --stdin-content with more than one path" do
+      code, _, err = run(["match", "--stdin-content", "--repo-root", "/tmp", "a.cr", "b.cr"])
+      code.should eq(1)
+      err.should contain("--stdin-content takes exactly one path")
+    end
+
+    it "rejects an unknown format" do
+      code, _, err = run(["match", "--format", "xml", "--repo-root", "/tmp", "a.cr"])
+      code.should eq(1)
+      err.should contain("unknown --format 'xml'")
+    end
+
+    it "rejects --format without a value" do
+      code, _, err = run(["match", "--format"])
+      code.should eq(1)
+      err.should contain("--format requires a value")
+    end
+
+    it "rejects --repo-root without a value" do
+      code, _, err = run(["match", "--repo-root"])
+      code.should eq(1)
+      err.should contain("--repo-root requires a directory")
+    end
+
+    it "rejects an unknown option" do
+      code, _, err = run(["match", "--bogus", "a.cr"])
+      code.should eq(1)
+      err.should contain("unknown option '--bogus'")
+    end
+
+    it "errors when no repository root can be found" do
+      with_fixture_repo do |dir|
+        code, _, err = in_dir(dir) { run(["match", "src/x.cr"]) }
+        code.should eq(1)
+        err.should contain("no repository root found")
+      end
+    end
+  end
+
+  describe "review" do
+    it "emits a manifest for a git range" do
+      with_git_repo do |dir|
+        code, out, err = run(["review", "--repo-root", dir, "main...HEAD"])
+        code.should eq(0)
+        err.should be_empty
+        out.should contain("# Review manifest (main...HEAD)")
+        out.should contain("docs/conventions/a.md")
+      end
+    end
+
+    it "resolves the default range and repo root from the working directory" do
+      with_git_repo do |dir|
+        code, out, _ = in_dir(dir) { run(["review", "--format", "json"]) }
+        code.should eq(0)
+        out.should contain(%("range": "main...HEAD"))
+      end
+    end
+
+    it "rejects an unknown format" do
+      code, _, err = run(["review", "--format", "html", "--repo-root", "/tmp"])
+      code.should eq(1)
+      err.should contain("unknown --format 'html'")
+    end
+
+    it "rejects --format without a value" do
+      code, _, err = run(["review", "--format"])
+      code.should eq(1)
+      err.should contain("--format requires a value")
+    end
+
+    it "rejects --repo-root without a value" do
+      code, _, err = run(["review", "--repo-root"])
+      code.should eq(1)
+      err.should contain("--repo-root requires a directory")
+    end
+
+    it "rejects a second git range" do
+      code, _, err = run(["review", "a...b", "c...d"])
+      code.should eq(1)
+      err.should contain("only one git range may be given")
+    end
+
+    it "rejects an unknown option" do
+      code, _, err = run(["review", "--bogus"])
+      code.should eq(1)
+      err.should contain("unknown option '--bogus'")
+    end
+
+    it "errors when no repository root can be found" do
+      with_fixture_repo do |dir|
+        code, _, err = in_dir(dir) { run(["review"]) }
+        code.should eq(1)
+        err.should contain("no repository root found")
+      end
     end
   end
 end
