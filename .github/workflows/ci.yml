@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Refinement of PRD §7.3: the spec/lint/coverage job runs on ubuntu-latest via
+# the install-crystal action rather than the crystallang/crystal:alpine
+# container, because kcov (the coverage gate) installs cleanly from apt on
+# ubuntu but not on Alpine. The static musl build still uses Alpine — in
+# release.yml, via `docker run` (the Crystal Alpine image ships no Node, which
+# breaks JS-based Actions run *inside* a container).
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: 1.20.3
+
+      - name: Install dependencies
+        run: shards install
+
+      - name: Format check
+        run: crystal tool format --check
+
+      - name: Lint (ameba, zero findings)
+        run: ./bin/ameba
+
+      - name: Specs
+        run: crystal spec
+
+      - name: Install coverage tooling
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends kcov jq
+
+      - name: Coverage (100% line gate)
+        run: ./scripts/coverage.sh
+
+      - name: Unreachable-code check (paired with coverage — PRD §8.2)
+        run: crystal tool unreachable src/muninn.cr
+
+      - name: Release smoke build
+        run: crystal build --release src/muninn.cr -o bin/muninn

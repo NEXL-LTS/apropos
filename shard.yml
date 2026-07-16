@@ -1,0 +1,25 @@
+name: muninn-rules
+version: 0.1.0
+description: |
+  Muninn delivers the right documentation to the right moment. It is a single
+  deterministic binary that implements the Agent Documentation Structure
+  Standard: it compiles convention-doc frontmatter into a trigger index,
+  generates skill wrappers, serves as a Claude Code hook handler that injects
+  path- and construct-scoped rules at edit time, and resolves the conventions
+  applicable to a diff for review.
+
+authors:
+  - Grant PS <grant@nexl.io>
+
+targets:
+  muninn:
+    main: src/muninn.cr
+
+crystal: ">= 1.20"
+
+license: MIT
+
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba
+    version: ~> 1.6

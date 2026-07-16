@@ -1,1 +1,18 @@
 /.claude/*.lock
+
+# Crystal / shards build artifacts
+/bin/
+/lib/
+/.shards/
+*.dwarf
+
+# Local caches: Crystal compile cache, muninn trigger index + session state.
+# The Makefile points CRYSTAL_CACHE_DIR here so `make` works even where the
+# global ~/.cache/crystal is not writable.
+/.cache/
+
+# On-demand crytic install for `make mutate` (advisory-only, never in CI — PRD §8.1)
+/.crytic/
+
+# coverage output
+/coverage/

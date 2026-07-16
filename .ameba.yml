@@ -1,0 +1,11 @@
+# Ameba configuration — https://github.com/crystal-ameba/ameba
+# Zero findings is a CI gate (PRD §8.3). Keep this minimal: add a rule override
+# only with a comment recording the judgment call behind it. Guidance that
+# ameba cannot enforce lives in docs/conventions/ (the incubator principle).
+Globs:
+  - "src/**/*.cr"
+  - "spec/**/*.cr"
+
+Excluded:
+  - lib
+  - bin

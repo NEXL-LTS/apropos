@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+# Written as a matrix from day one with only the Linux leg enabled (PRD §7.3).
+# Roadmap legs (disabled until their own CI is green):
+#   - macOS arm64/x86_64 (dynamic against system libs; macOS has no static libc)
+#   - Windows x86_64 (Crystal Windows support is Preview — no production promise)
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: muninn-linux-x86_64, runner: ubuntu-latest }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Build fully static against musl inside the Crystal Alpine image. Using
+      # `docker run` (rather than a job `container:`) keeps checkout and the
+      # release Action on the host, where Node is available.
+      - name: Build static binary (musl/alpine)
+        run: |
+          docker run --rm -v "$PWD":/w -w /w crystallang/crystal:1.20-alpine sh -c '
+            set -e
+            shards install --production
+            crystal build --release --static src/muninn.cr -o ${{ matrix.name }}
+          '
+
+      - name: Verify static linkage
+        run: |
+          file ${{ matrix.name }}
+          # A fully static binary reports "not a dynamic executable".
+          ldd ${{ matrix.name }} 2>&1 | grep -q "not a dynamic executable" \
+            || { echo "ERROR: binary is not fully static"; exit 1; }
+
+      - name: Checksum
+        run: sha256sum ${{ matrix.name }} > ${{ matrix.name }}.sha256
+
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ matrix.name }}
+            ${{ matrix.name }}.sha256
