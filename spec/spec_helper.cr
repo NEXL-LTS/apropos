@@ -1,2 +1,5 @@
 require "spec"
 require "../src/muninn/cli"
+require "../src/muninn/frontmatter"
+require "../src/muninn/matcher"
+require "../src/muninn/conventions"
