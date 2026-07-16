@@ -29,6 +29,10 @@ class InMemoryFS < Muninn::Filesystem
     @files[path] = content
   end
 
+  def append(path : String, content : String) : Nil
+    @files[path] = "#{@files[path]?}#{content}"
+  end
+
   def remove(path : String) : Nil
     @removed << path
     @files.reject! { |key, _| key == path || key.starts_with?("#{path}/") }

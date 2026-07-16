@@ -1,5 +1,6 @@
 require "./version"
 require "./generate"
+require "./hook"
 require "./repo_root"
 require "./filesystem"
 
@@ -31,11 +32,11 @@ module Muninn
         --help, -h  Print this usage and exit
       USAGE
 
-    def self.run(args : Array(String), stdout : IO = STDOUT, stderr : IO = STDERR) : Int32
-      new(stdout, stderr).run(args)
+    def self.run(args : Array(String), stdout : IO = STDOUT, stderr : IO = STDERR, stdin : IO = STDIN) : Int32
+      new(stdout, stderr, stdin).run(args)
     end
 
-    def initialize(@stdout : IO, @stderr : IO)
+    def initialize(@stdout : IO, @stderr : IO, @stdin : IO = STDIN)
     end
 
     def run(args : Array(String)) : Int32
@@ -48,6 +49,8 @@ module Muninn
         0
       when "generate"
         handle_generate(args[1..])
+      when "hook"
+        handle_hook(args[1..])
       else
         @stderr.puts "muninn: unknown command '#{args.first}'. Run `muninn --help`."
         1
@@ -94,6 +97,32 @@ module Muninn
     private def usage_error(message : String) : Int32
       @stderr.puts "muninn generate: #{message}"
       1
+    end
+
+    # `muninn hook pre|post [--repo-root DIR]` (PRD §5.4, §5.5). Claude Code
+    # invokes these with the payload on stdin. The whole family fails *open*: an
+    # unknown subcommand or a bad `--repo-root` yields exit 0 with no output
+    # rather than ever blocking an edit. All work lives in `Hook`.
+    private def handle_hook(args : Array(String)) : Int32
+      event = args.first?
+      return 0 unless event == "pre" || event == "post"
+
+      override = repo_root_override(args[1..])
+      verbose = {"1", "true"}.includes?(ENV["MUNINN_VERBOSE"]?)
+      fs = Filesystem::Real.new
+      now = Time.utc
+      if event == "pre"
+        Hook.pre(@stdin, @stdout, fs, now, override, verbose)
+      else
+        Hook.post(@stdin, @stdout, fs, now, override, verbose)
+      end
+    end
+
+    # Extract a `--repo-root DIR` override from hook args, ignoring anything else
+    # (fail open — a stray flag must not break the hook path).
+    private def repo_root_override(args : Array(String)) : String?
+      index = args.index("--repo-root")
+      index ? args[index + 1]? : nil
     end
   end
 end

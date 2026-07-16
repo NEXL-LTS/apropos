@@ -1,10 +1,10 @@
 require "../spec_helper"
 require "file_utils"
 
-private def run(args : Array(String))
+private def run(args : Array(String), stdin : String = "")
   stdout = IO::Memory.new
   stderr = IO::Memory.new
-  code = Muninn::CLI.run(args, stdout, stderr)
+  code = Muninn::CLI.run(args, stdout, stderr, IO::Memory.new(stdin))
   {code, stdout.to_s, stderr.to_s}
 end
 
@@ -117,6 +117,46 @@ describe Muninn::CLI do
       code, _, err = run(["generate", "--bogus"])
       code.should eq(1)
       err.should contain("unknown option '--bogus'")
+    end
+  end
+
+  describe "hook" do
+    it "injects a Layer 2 rule on pre with an explicit repo root" do
+      with_fixture_repo do |dir|
+        payload = {session_id: "s", tool_name: "Edit", cwd: dir,
+                   tool_input: {file_path: File.join(dir, "src/x.cr")}}.to_json
+        code, out, err = run(["hook", "pre", "--repo-root", dir], payload)
+        code.should eq(0)
+        err.should be_empty
+        out.should contain("Convention (docs/conventions/a.md):")
+      end
+    end
+
+    it "runs post through the real filesystem and exits 0" do
+      with_fixture_repo do |dir|
+        payload = {session_id: "s", tool_name: "Write", cwd: dir,
+                   tool_input: {file_path: File.join(dir, "src/x.cr"), content: "code"}}.to_json
+        code, out, _ = run(["hook", "post", "--repo-root", dir], payload)
+        code.should eq(0)
+        out.should be_empty
+      end
+    end
+
+    it "resolves the repo root from the payload cwd by default" do
+      with_fixture_repo(git: true) do |dir|
+        payload = {session_id: "s", tool_name: "Edit", cwd: dir,
+                   tool_input: {file_path: "src/x.cr"}}.to_json
+        code, out, _ = run(["hook", "pre"], payload)
+        code.should eq(0)
+        out.should contain("Convention (docs/conventions/a.md):")
+      end
+    end
+
+    it "exits 0 on an unknown hook subcommand (fail open)" do
+      code, out, err = run(["hook", "frobnicate"])
+      code.should eq(0)
+      out.should be_empty
+      err.should be_empty
     end
   end
 end

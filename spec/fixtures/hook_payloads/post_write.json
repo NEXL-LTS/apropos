@@ -1,0 +1,10 @@
+{
+  "session_id": "abc123",
+  "transcript_path": "/home/u/.claude/projects/x/session.jsonl",
+  "cwd": "/repo",
+  "tool_name": "Write",
+  "tool_input": {
+    "file_path": "db/migrate/001_create.cr",
+    "content": "class Create\n  def up\n    transaction do\n    end\n  end\nend\n"
+  }
+}

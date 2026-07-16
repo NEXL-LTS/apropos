@@ -24,6 +24,10 @@ private class FakeFS < Muninn::Filesystem
     @files[path] = content
   end
 
+  def append(path : String, content : String) : Nil
+    @files[path] = "#{@files[path]?}#{content}"
+  end
+
   def remove(path : String) : Nil
     @files.delete(path)
   end

@@ -31,6 +31,19 @@ describe Muninn::Filesystem::Real do
     end
   end
 
+  it "appends to a file, creating it and its parents on first write" do
+    dir = File.tempname("muninn-fs")
+    fs = Muninn::Filesystem::Real.new
+    begin
+      target = File.join(dir, "logs/hook.log")
+      fs.append(target, "one\n")
+      fs.append(target, "two\n")
+      File.read(target).should eq("one\ntwo\n")
+    ensure
+      FileUtils.rm_rf(dir)
+    end
+  end
+
   it "removes a directory tree and is a no-op when the target is absent" do
     dir = File.tempname("muninn-fs")
     fs = Muninn::Filesystem::Real.new
