@@ -106,9 +106,9 @@ Walks `docs/conventions/**/*.md`, parses frontmatter, and emits:
 
 ### 5.4 `muninn hook pre` (Layer 2 delivery)
 
-Reads the PreToolUse JSON from stdin. Contract with Claude Code (verified against the current hooks reference).
+Reads the PreToolUse JSON from stdin. Contract per the current Claude Code hooks reference; the exact `tool_input` field names are pinned by captured fixtures (§8.4), not this prose, since the schema evolves.
 
-> **Refinement over the standard:** the standard's "Trigger mechanics" section delivers *both* Layer 2 and Layer 3 through a single PostToolUse hook. Muninn deliberately splits them — Layer 2 fires on **PreToolUse** because the target path is knowable before the edit, so path-scoped guidance arrives *before* the write rather than after it; Layer 3 stays on PostToolUse because the written content only exists afterward. This is now possible because PreToolUse supports `additionalContext` (Claude Code ≥ 2.0, verified below).
+> **Refinement over the standard:** the standard's "Trigger mechanics" section delivers *both* Layer 2 and Layer 3 through a single PostToolUse hook. Muninn deliberately splits them — Layer 2 fires on **PreToolUse** because the target path is knowable before the edit, so path-scoped guidance arrives *before* the write rather than after it; Layer 3 stays on PostToolUse because the written content only exists afterward. This depends on PreToolUse supporting `additionalContext`: the current hooks reference lists `additionalContext` for PreToolUse (alongside `PostToolUse`, `UserPromptSubmit`, `SessionStart`, etc.), but this arrived after the PostToolUse path, so older CLIs may inject only on PostToolUse (see the capability note below).
 
 A representative PreToolUse payload arriving on stdin:
 
@@ -143,13 +143,13 @@ Design rules for the injected text, following the docs' guidance:
 - Muninn **never** emits `permissionDecision`. It is context-only and must not interfere with the permission flow.
 - Any internal error → `exit 0` silently (log to `.cache/muninn/log` with `--verbose` honored via env). A conventions tool must fail open; it can never block an edit.
 
-Version note: PreToolUse `additionalContext` requires Claude Code ≥ 2.0 (per the hooks reference version-gate table). `init` records this in the generated `docs/conventions/README.md`, and `muninn doctor` (§5.8) checks `claude --version` when available.
+Capability note: PreToolUse `additionalContext` is available in current Claude Code, but was not in the earliest hook releases (the PostToolUse path is the older, universally-supported one). Rather than hardcode a version boundary the docs no longer state explicitly, `muninn doctor` (§5.8) checks the installed `claude --version` against a minimum recorded in the binary and warns if PreToolUse injection may be unavailable; the generated `docs/conventions/README.md` notes the requirement. If PreToolUse injection is unsupported, L2 delivery degrades to PostToolUse with no loss of correctness (path is still knowable post-write) — a documented fallback.
 
 ### 5.5 `muninn hook post` (Layer 3 delivery)
 
 Reads the PostToolUse JSON from stdin.
 
-- Extract written content: `tool_input.content` (Write), `tool_input.new_string` (Edit), or all `new_string`s (MultiEdit-style inputs). Fallback: if absent but `tool_input.file_path` exists, read the file from disk. These exact field names are the one part of the contract most exposed to schema drift, so the captured fixtures in §8.4 — not this prose — are the authoritative source; the disk-read fallback keeps L3 working even if a field is renamed upstream.
+- Extract written content: `tool_input.content` (Write), `tool_input.new_string` (Edit), or every `new_string` in a batch-edit input where the running Claude Code version exposes one (historically a `MultiEdit`-style tool; not present in every version). Fallback: if the content field is absent but `tool_input.file_path` exists, read the file from disk. These exact field names are the one part of the contract most exposed to schema drift, so the captured fixtures in §8.4 — not this prose — are the authoritative source; the disk-read fallback keeps L3 working even if a field is renamed upstream.
 - Match content against every L3 regex; where the rule also has `paths:`, require the file path to match too (AND semantics).
 - Dedup, cap, output shape, and fail-open behavior identical to `hook pre`, with `hookEventName: "PostToolUse"`. Never emits `decision: "block"`.
 
@@ -176,7 +176,7 @@ State at `.cache/muninn/sessions/<session_id>.json`: a set of rule-file paths al
 - Skill-enabled docs over 500 lines: warning.
 - Generated `SKILL.md` files that don't match generator output (same check as `generate --check`).
 
-`doctor` checks the environment: hooks present in `.claude/settings.json` and pointing at a resolvable `muninn`, Claude Code version ≥ 2.0 if `claude` is on PATH, index freshness, cache writability.
+`doctor` checks the environment: hooks present in `.claude/settings.json` and pointing at a resolvable `muninn`, a Claude Code version new enough to support PreToolUse `additionalContext` (§5.4) if `claude` is on PATH, index freshness, cache writability.
 
 ### 5.9 `muninn help` (dual-audience explainer)
 
@@ -271,7 +271,7 @@ This repo uses the structure on itself, with a deliberate self-hosting ladder:
 
 Development is spec-first: every module lands as a failing spec, then implementation. **Crytic** drives mutation-hardening of the pure logic modules (`matcher`, `frontmatter`, `index`, `session_state`, `review` diff parsing) — the places where a surviving mutant means a real correctness gap.
 
-Per your call, crytic is **local/advisory only**: a `make mutate` target and a documented workflow ("run crytic on the module you touched; kill or consciously justify survivors in the PR description"), not a CI gate. Rationale recorded in the repo: crytic is single-maintainer and sporadically updated (last release bumps it to Crystal 1.18.2), so it typically trails the latest Crystal release by a version or two; if it fails to build against the target Crystal at spike time, the fallback is documented manual mutation sessions (deliberate operator flips guided by a checklist) for the same modules, and the make target prints that instruction instead. (Note: this is `hanneskaeufler/crytic`, the Crystal mutation-testing tool — not the unrelated Solidity `crytic` tooling of the same name.)
+Per your call, crytic is **local/advisory only**: a `make mutate` target and a documented workflow ("run crytic on the module you touched; kill or consciously justify survivors in the PR description"), not a CI gate. Rationale recorded in the repo: crytic is single-maintainer and effectively dormant — its last tagged release (v9.0.0, May 2024) targets Crystal 1.12.1, and the only bump toward a modern Crystal (1.18.2) exists as an unreleased master commit (Nov 2025), never tagged — so it trails the latest Crystal release substantially; if it fails to build against the target Crystal at spike time, the fallback is documented manual mutation sessions (deliberate operator flips guided by a checklist) for the same modules, and the make target prints that instruction instead. (Note: this is `hanneskaeufler/crytic`, the Crystal mutation-testing tool — not the unrelated Solidity `crytic` tooling of the same name.)
 
 **Crytic is disposable.** Because it is advisory-only and never gates CI, it can be dropped at any point — at the M0 spike or later, if a Crystal upgrade breaks it — with no effect on the build, release, or correctness guarantees; the 100% coverage gate and ameba are the actual quality floor. To drop it: remove the `make mutate` target (or leave it printing the manual-mutation checklist), delete the dev-dependency, and note it in the changelog.
 
@@ -287,7 +287,7 @@ Ameba as a dev dependency, zero-findings CI gate, config committed. Muninn's own
 
 ### 8.4 Contract tests against Claude Code
 
-Fixture JSON payloads for PreToolUse/PostToolUse captured from a real Claude Code session (Edit, Write, MultiEdit shapes) live in `spec/fixtures/hook_payloads/`. These captures — not any prose in §5.4/§5.5 — are the authoritative record of the `tool_input` field names (`file_path`, `content`, `new_string`, …); when the schema drifts, the re-captured fixture is the single place the truth is updated and the parser follows. A quarterly (and on-report) task re-captures them, since the hooks schema is actively evolving. Output-side assertions verify the exact `hookSpecificOutput` envelope and the 10k cap behavior.
+Fixture JSON payloads for PreToolUse/PostToolUse captured from a real Claude Code session (Edit, Write, and any batch-edit shape the running version exposes) live in `spec/fixtures/hook_payloads/`. These captures — not any prose in §5.4/§5.5 — are the authoritative record of the `tool_input` field names (`file_path`, `content`, `new_string`, …); when the schema drifts, the re-captured fixture is the single place the truth is updated and the parser follows. A quarterly (and on-report) task re-captures them, since the hooks schema is actively evolving. Output-side assertions verify the exact `hookSpecificOutput` envelope and the 10k cap behavior.
 
 ## 9. Implementation plan
 
@@ -305,7 +305,7 @@ Each milestone ends green: specs pass, coverage 100%, ameba clean.
 
 **M5 — init, lint, doctor, help (2 days):** settings.json merge (preserve foreign keys/hooks, idempotent), scaffolding with `--example`, full lint rule set, doctor checks, and `muninn help` (single-source prose + JSON explainer with the agent-addressed block; spec asserts JSON lists every exposed command).
 
-**M6 — Self-host + release (1–2 days):** replace Phase 0 scripts via `muninn init --force`; add self-check to CI; release workflow, static build verification, install.sh; README with the version-requirement callout (Claude Code ≥ 2.0 for PreToolUse context injection).
+**M6 — Self-host + release (1–2 days):** replace Phase 0 scripts via `muninn init --force`; add self-check to CI; release workflow, static build verification, install.sh; README with the version-requirement callout (a recent-enough Claude Code for PreToolUse context injection; §5.4).
 
 **Post-v1 backlog:** macOS/Windows release legs; `--redup-after N`; Cursor/Copilot emitters from the same frontmatter; advisory-lint-rule linkage (teaching messages that reference rule files); `review` posting mode for CI (GitHub PR comments).
 
@@ -317,10 +317,10 @@ Total: roughly **2–2.5 focused weeks** to a self-hosting v1.
 | --- | --- | --- |
 | Crytic won't build on Crystal 1.20 | Loses automated mutation testing | Spiked at M0; advisory-only, never a CI gate; documented manual fallback, or drop crytic entirely with no impact on build/release/correctness |
 | Claude Code hooks schema drift | Hook payloads stop parsing | Tolerant parsing (ignore unknown fields, required-fields-only), fixture re-capture cadence, fail-open |
-| PreToolUse `additionalContext` min version (≥ 2.0) | L2 silently not delivered on old CLIs | `doctor` version check; README callout; L3/PostToolUse path unaffected |
+| PreToolUse `additionalContext` unsupported on old CLIs | L2 silently not delivered | `doctor` capability check; README callout; documented degrade to PostToolUse delivery for L2 (§5.4); L3/PostToolUse path unaffected |
 | 100% coverage friction on I/O edges | Slower iteration | I/O behind thin injectable adapters from M1 onward |
 | kcov mis-counts (inlining / dead-code elimination) | 100% gate becomes misleading or brittle | Documented reviewed exclusions; pair gate with `crystal tool unreachable`; treat as "no reachable line untested" (§8.2) |
-| Regex cost on large writes (L3) | Hook latency blowout | Index precompiles; benchmark spec; bound cost via PCRE2 `match_limit` (a computation-step cap, not a wall-clock timeout), falling back to a pre-match input-size cap if Crystal's `Regex` API doesn't expose the limit |
+| Regex cost on large writes (L3) | Hook latency blowout | Index precompiles; benchmark spec; bound cost with a pre-match input-size cap (Crystal's `Regex` API does **not** expose PCRE2's `match_limit`/`heap_limit` — confirmed, see §11.4 — so the input-size cap, plus PCRE2's JIT keeping matches fast, is the available lever) |
 | `settings.json` merge corrupting user config | Breaks someone's setup | Merge is additive + marked entries only; writes via temp+rename; `--dry-run` prints the diff |
 | Crystal Windows maturity | Windows target slips | Explicitly tier 2; matrix pre-wired, enabled only when its CI is green |
 
@@ -329,4 +329,4 @@ Total: roughly **2–2.5 focused weeks** to a self-hosting v1.
 1. Should `hook pre` also read the *proposed* content from `tool_input` and pre-fire L3 rules before the write? Technically possible (Write/Edit inputs carry the new content) and would make L3 preventive rather than corrective — but it doubles L3 evaluation and deviates further from the spec doc. Default: no in v1; revisit with usage data.
 2. Dedup key granularity: per rule file (current design) vs per rule-file@hash, so an edited rule re-injects within the same session. Default: per file; hash-aware is a small follow-up.
 3. `review` merge-base default branch detection (`origin/HEAD` vs `main|master` probing) — pick during M4 with fixtures for both.
-4. Whether Crystal's `Regex` API exposes PCRE2's `match_limit`/`heap_limit` for per-match bounding, or whether the pre-match input-size cap (§10) is the only lever available. Verify against the actual API during M1.
+4. **(Resolved.)** Crystal's `Regex` API does **not** expose PCRE2's `match_limit`/`heap_limit` (the public surface is limited to compile/match options like `IGNORE_CASE`/`MULTILINE`; upstream issue crystal-lang/crystal#15321 tracks the gap). Per-match bounding therefore relies on the pre-match input-size cap (§10), with PCRE2 JIT keeping matches fast. Revisit only if the stdlib later surfaces the limit.
