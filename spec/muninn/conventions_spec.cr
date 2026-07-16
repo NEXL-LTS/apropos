@@ -31,6 +31,13 @@ private class FakeFS < Muninn::Filesystem
   def remove(path : String) : Nil
     @files.delete(path)
   end
+
+  def exists?(path : String) : Bool
+    @files.has_key?(path)
+  end
+
+  def symlink(target : String, link_path : String) : Nil
+  end
 end
 
 private def convention(frontmatter : String) : Muninn::Convention

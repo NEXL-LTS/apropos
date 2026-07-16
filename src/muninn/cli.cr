@@ -3,6 +3,11 @@ require "./generate"
 require "./hook"
 require "./review"
 require "./git"
+require "./init"
+require "./lint"
+require "./doctor"
+require "./help"
+require "./environment"
 require "./repo_root"
 require "./filesystem"
 
@@ -42,23 +47,33 @@ module Muninn
     end
 
     def run(args : Array(String)) : Int32
-      case args.first?
-      when nil, "--help", "-h", "help"
+      case first = args.first?
+      when nil, "--help", "-h"
         @stdout.puts USAGE
         0
       when "--version", "version"
         @stdout.puts "muninn #{VERSION}"
         0
-      when "generate"
-        handle_generate(args[1..])
-      when "hook"
-        handle_hook(args[1..])
-      when "match"
-        handle_match(args[1..])
-      when "review"
-        handle_review(args[1..])
       else
-        @stderr.puts "muninn: unknown command '#{args.first}'. Run `muninn --help`."
+        dispatch(first, args[1..])
+      end
+    end
+
+    # Route a subcommand to its handler. Kept separate from `run` so neither the
+    # dispatch table nor the version/usage shortcuts push the other over the
+    # cyclomatic-complexity gate.
+    private def dispatch(command : String, rest : Array(String)) : Int32
+      case command
+      when "help"     then Help.run(rest, @stdout)
+      when "init"     then handle_init(rest)
+      when "generate" then handle_generate(rest)
+      when "hook"     then handle_hook(rest)
+      when "match"    then handle_match(rest)
+      when "review"   then handle_review(rest)
+      when "lint"     then handle_lint(rest)
+      when "doctor"   then handle_doctor(rest)
+      else
+        @stderr.puts "muninn: unknown command '#{command}'. Run `muninn --help`."
         1
       end
     end
@@ -103,6 +118,104 @@ module Muninn
     private def usage_error(message : String) : Int32
       @stderr.puts "muninn generate: #{message}"
       1
+    end
+
+    # Mutable holder for parsed `init` options, keeping the parse loop small
+    # enough to stay under the cyclomatic-complexity gate.
+    private class InitArgs
+      property? force = false
+      property? example = false
+      property? claude_symlink = false
+      property? dry_run = false
+      property override : String? = nil
+    end
+
+    # `muninn init [--force] [--example] [--claude-symlink] [--dry-run]
+    # [--repo-root DIR]` (PRD §5.1). An authoring command: fails *closed*.
+    private def handle_init(args : Array(String)) : Int32
+      opts = InitArgs.new
+      if code = parse_init_args(args, opts)
+        return code
+      end
+
+      root = resolve_repo_root(opts.override)
+      return repo_root_error("init") if root.nil?
+
+      options = Init::Options.new(
+        force: opts.force?, example: opts.example?,
+        claude_symlink: opts.claude_symlink?, dry_run: opts.dry_run?)
+      Init.run(root, Filesystem::Real.new, options, @stdout, @stderr)
+    end
+
+    private def parse_init_args(args : Array(String), opts : InitArgs) : Int32?
+      index = 0
+      while index < args.size
+        case arg = args[index]
+        when "--force"          then opts.force = true
+        when "--example"        then opts.example = true
+        when "--claude-symlink" then opts.claude_symlink = true
+        when "--dry-run"        then opts.dry_run = true
+        when "--repo-root"
+          index += 1
+          value = args[index]?
+          return command_error("init", "--repo-root requires a directory") if value.nil?
+          opts.override = value
+        else
+          return command_error("init", "unknown option '#{arg}'")
+        end
+        index += 1
+      end
+      nil
+    end
+
+    # `muninn lint [--strict] [--repo-root DIR]` (PRD §5.8). CI command: fails
+    # *closed*.
+    private def handle_lint(args : Array(String)) : Int32
+      strict = false
+      override : String? = nil
+      index = 0
+      while index < args.size
+        case arg = args[index]
+        when "--strict"
+          strict = true
+        when "--repo-root"
+          index += 1
+          value = args[index]?
+          return command_error("lint", "--repo-root requires a directory") if value.nil?
+          override = value
+        else
+          return command_error("lint", "unknown option '#{arg}'")
+        end
+        index += 1
+      end
+
+      root = resolve_repo_root(override)
+      return repo_root_error("lint") if root.nil?
+
+      Lint.run(root, Filesystem::Real.new, strict, @stdout, @stderr)
+    end
+
+    # `muninn doctor [--repo-root DIR]` (PRD §5.8).
+    private def handle_doctor(args : Array(String)) : Int32
+      override : String? = nil
+      index = 0
+      while index < args.size
+        case arg = args[index]
+        when "--repo-root"
+          index += 1
+          value = args[index]?
+          return command_error("doctor", "--repo-root requires a directory") if value.nil?
+          override = value
+        else
+          return command_error("doctor", "unknown option '#{arg}'")
+        end
+        index += 1
+      end
+
+      root = resolve_repo_root(override)
+      return repo_root_error("doctor") if root.nil?
+
+      Doctor.run(root, Filesystem::Real.new, Environment::Real.new, @stdout, @stderr)
     end
 
     # `muninn hook pre|post [--repo-root DIR]` (PRD §5.4, §5.5). Claude Code
@@ -240,6 +353,11 @@ module Muninn
 
     private def repo_root_error(command : String) : Int32
       @stderr.puts "muninn #{command}: no repository root found (looked for .git). Pass --repo-root."
+      1
+    end
+
+    private def command_error(command : String, message : String) : Int32
+      @stderr.puts "muninn #{command}: #{message}"
       1
     end
 

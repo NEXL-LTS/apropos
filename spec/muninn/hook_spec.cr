@@ -52,6 +52,13 @@ private class ExplodingFS < Muninn::Filesystem
 
   def remove(path : String) : Nil
   end
+
+  def exists?(path : String) : Bool
+    false
+  end
+
+  def symlink(target : String, link_path : String) : Nil
+  end
 end
 
 private def pre_json(file_path : String, session_id : String? = "s", cwd : String? = "/repo") : String

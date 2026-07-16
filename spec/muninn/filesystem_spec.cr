@@ -57,4 +57,36 @@ describe Muninn::Filesystem::Real do
       FileUtils.rm_rf(dir)
     end
   end
+
+  it "reports existence for files, directories, and (even dangling) symlinks" do
+    dir = File.tempname("muninn-fs")
+    fs = Muninn::Filesystem::Real.new
+    begin
+      Dir.mkdir_p(dir)
+      file = File.join(dir, "file.txt")
+      File.write(file, "x")
+      fs.exists?(file).should be_true
+      fs.exists?(dir).should be_true
+      fs.exists?(File.join(dir, "nope")).should be_false
+
+      link = File.join(dir, "dangling")
+      File.symlink(File.join(dir, "absent-target"), link)
+      fs.exists?(link).should be_true # dangling link still "exists"
+    ensure
+      FileUtils.rm_rf(dir)
+    end
+  end
+
+  it "creates a symlink, making parent directories as needed" do
+    dir = File.tempname("muninn-fs")
+    fs = Muninn::Filesystem::Real.new
+    begin
+      link = File.join(dir, "nested/CLAUDE.md")
+      fs.symlink("AGENTS.md", link)
+      File.symlink?(link).should be_true
+      File.readlink(link).should eq("AGENTS.md")
+    ensure
+      FileUtils.rm_rf(dir)
+    end
+  end
 end

@@ -36,6 +36,19 @@ module Muninn
       sources.any? { |source| content_match?(source, content) }
     end
 
+    # Is `pattern` a syntactically valid path glob? Surfaced by lint (PRD §5.8).
+    # `File.match?` only parses a pattern segment once the candidate path reaches
+    # it, so we match against a structurally-identical sample built by neutralizing
+    # the glob metacharacters — forcing every segment (including a malformed `[`
+    # set) to be parsed.
+    def valid_glob?(pattern : String) : Bool
+      sample = pattern.gsub(/[*?\[\]!]/, "a")
+      File.match?(pattern, sample)
+      true
+    rescue File::BadPatternError
+      false
+    end
+
     # Compile a regex source, translating PCRE2 compile failures into a muninn
     # error so callers get a consistent type to rescue.
     def compile(source : String) : Regex

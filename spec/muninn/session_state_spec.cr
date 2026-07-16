@@ -34,6 +34,13 @@ private class PhantomFS < Muninn::Filesystem
   def remove(path : String) : Nil
     raise "prune must not remove a file it could not read"
   end
+
+  def exists?(path : String) : Bool
+    false
+  end
+
+  def symlink(target : String, link_path : String) : Nil
+  end
 end
 
 describe Muninn::SessionState do

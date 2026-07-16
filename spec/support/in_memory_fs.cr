@@ -7,9 +7,11 @@ require "../../src/muninn/filesystem"
 class InMemoryFS < Muninn::Filesystem
   getter files : Hash(String, String)
   getter removed : Array(String)
+  getter symlinks : Hash(String, String)
 
   def initialize(@files = {} of String => String)
     @removed = [] of String
+    @symlinks = {} of String => String
   end
 
   def glob(base : Path, pattern : String) : Array(String)
@@ -36,5 +38,14 @@ class InMemoryFS < Muninn::Filesystem
   def remove(path : String) : Nil
     @removed << path
     @files.reject! { |key, _| key == path || key.starts_with?("#{path}/") }
+  end
+
+  def exists?(path : String) : Bool
+    @files.has_key?(path) || @symlinks.has_key?(path) ||
+      @files.each_key.any?(&.starts_with?("#{path}/"))
+  end
+
+  def symlink(target : String, link_path : String) : Nil
+    @symlinks[link_path] = target
   end
 end

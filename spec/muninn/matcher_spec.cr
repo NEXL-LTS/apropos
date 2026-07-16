@@ -56,4 +56,14 @@ describe Muninn::Matcher do
       Muninn::Matcher.any_content_match?([] of String, "content").should be_false
     end
   end
+
+  describe ".valid_glob?" do
+    it "is true for a well-formed glob" do
+      Muninn::Matcher.valid_glob?("src/**/*.cr").should be_true
+    end
+
+    it "is false for a malformed glob (unterminated character set)" do
+      Muninn::Matcher.valid_glob?("src/[").should be_false
+    end
+  end
 end

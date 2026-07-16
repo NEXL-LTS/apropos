@@ -70,12 +70,33 @@ describe Muninn::CLI do
       err.should be_empty
     end
 
-    it "prints usage for --help, -h, and help" do
-      %w[--help -h help].each do |flag|
+    it "prints usage for --help and -h" do
+      %w[--help -h].each do |flag|
         code, out, _ = run([flag])
         code.should eq(0)
         out.should contain("Usage: muninn")
       end
+    end
+  end
+
+  describe "help" do
+    it "prints the mental-model explainer, distinct from --help usage" do
+      code, out, _ = run(["help"])
+      code.should eq(0)
+      out.should contain("What muninn is")
+      out.should_not contain("Usage: muninn")
+    end
+
+    it "renders the JSON explainer" do
+      code, stdout, _ = run(["help", "--format", "json"])
+      code.should eq(0)
+      JSON.parse(stdout)["commands"].as_a.should_not be_empty
+    end
+
+    it "explains a single command" do
+      code, out, _ = run(["help", "review"])
+      code.should eq(0)
+      out.should contain("muninn review —")
     end
   end
 
@@ -312,6 +333,126 @@ describe Muninn::CLI do
     it "errors when no repository root can be found" do
       with_fixture_repo do |dir|
         code, _, err = in_dir(dir) { run(["review"]) }
+        code.should eq(1)
+        err.should contain("no repository root found")
+      end
+    end
+  end
+
+  describe "init" do
+    it "scaffolds a repo against an explicit --repo-root" do
+      dir = File.tempname("muninn-cli-init")
+      begin
+        Dir.mkdir_p(dir)
+        code, out, err = run(["init", "--repo-root", dir])
+        code.should eq(0)
+        err.should be_empty
+        out.should contain("docs/conventions/README.md")
+        File.exists?(File.join(dir, ".claude/settings.json")).should be_true
+      ensure
+        FileUtils.rm_rf(dir)
+      end
+    end
+
+    it "threads every scaffolding flag through to Init" do
+      dir = File.tempname("muninn-cli-init-flags")
+      begin
+        Dir.mkdir_p(dir)
+        code, out, _ = run(["init", "--force", "--example", "--claude-symlink", "--dry-run", "--repo-root", dir])
+        code.should eq(0)
+        out.should contain("would create docs/conventions/example-path-rule.md")
+        out.should contain("would link CLAUDE.md -> AGENTS.md")
+        Dir.glob(File.join(dir, "**/*")).should be_empty # --dry-run wrote nothing
+      ensure
+        FileUtils.rm_rf(dir)
+      end
+    end
+
+    it "rejects --repo-root without a value" do
+      code, _, err = run(["init", "--repo-root"])
+      code.should eq(1)
+      err.should contain("--repo-root requires a directory")
+    end
+
+    it "rejects an unknown option" do
+      code, _, err = run(["init", "--bogus"])
+      code.should eq(1)
+      err.should contain("unknown option '--bogus'")
+    end
+
+    it "errors when no repository root can be found" do
+      with_fixture_repo do |dir|
+        code, _, err = in_dir(dir) { run(["init"]) }
+        code.should eq(1)
+        err.should contain("no repository root found")
+      end
+    end
+  end
+
+  describe "lint" do
+    it "lints a generated fixture repo clean" do
+      with_fixture_repo do |dir|
+        run(["generate", "--repo-root", dir])
+        code, out, _ = run(["lint", "--repo-root", dir])
+        code.should eq(0)
+        out.should contain("lint: clean")
+      end
+    end
+
+    it "accepts --strict" do
+      with_fixture_repo do |dir|
+        run(["generate", "--repo-root", dir])
+        code, _, _ = run(["lint", "--strict", "--repo-root", dir])
+        code.should eq(0)
+      end
+    end
+
+    it "rejects --repo-root without a value" do
+      code, _, err = run(["lint", "--repo-root"])
+      code.should eq(1)
+      err.should contain("--repo-root requires a directory")
+    end
+
+    it "rejects an unknown option" do
+      code, _, err = run(["lint", "--bogus"])
+      code.should eq(1)
+      err.should contain("unknown option '--bogus'")
+    end
+
+    it "errors when no repository root can be found" do
+      with_fixture_repo do |dir|
+        code, _, err = in_dir(dir) { run(["lint"]) }
+        code.should eq(1)
+        err.should contain("no repository root found")
+      end
+    end
+  end
+
+  describe "doctor" do
+    it "reports the environment against an explicit --repo-root" do
+      with_fixture_repo do |dir|
+        code, out, _ = run(["doctor", "--repo-root", dir])
+        code.should eq(1) # no settings.json in the fixture → hooks check fails
+        out.should contain("doctor:")
+        out.should contain("settings.json not found")
+      end
+    end
+
+    it "rejects --repo-root without a value" do
+      code, _, err = run(["doctor", "--repo-root"])
+      code.should eq(1)
+      err.should contain("--repo-root requires a directory")
+    end
+
+    it "rejects an unknown option" do
+      code, _, err = run(["doctor", "--bogus"])
+      code.should eq(1)
+      err.should contain("unknown option '--bogus'")
+    end
+
+    it "errors when no repository root can be found" do
+      with_fixture_repo do |dir|
+        code, _, err = in_dir(dir) { run(["doctor"]) }
         code.should eq(1)
         err.should contain("no repository root found")
       end

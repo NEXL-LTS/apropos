@@ -31,6 +31,15 @@ module Muninn
     # (used to prune orphaned skill wrappers — PRD §5.3).
     abstract def remove(path : String) : Nil
 
+    # Does something exist at `path`? True for a regular file, a directory, or a
+    # (possibly dangling) symlink. `init` uses this to stay idempotent — a
+    # scaffold file is written only when absent (PRD §5.1).
+    abstract def exists?(path : String) : Bool
+
+    # Create a symlink at `link_path` pointing at `target`. Used by
+    # `init --claude-symlink` to alias `CLAUDE.md → AGENTS.md` (PRD §5.1).
+    abstract def symlink(target : String, link_path : String) : Nil
+
     # The production adapter: the only place `Dir`/`File` are called.
     class Real < Filesystem
       def glob(base : Path, pattern : String) : Array(String)
@@ -61,6 +70,15 @@ module Muninn
 
       def remove(path : String) : Nil
         FileUtils.rm_rf(path)
+      end
+
+      def exists?(path : String) : Bool
+        File.exists?(path) || File.symlink?(path) || Dir.exists?(path)
+      end
+
+      def symlink(target : String, link_path : String) : Nil
+        Dir.mkdir_p(Path[link_path].dirname)
+        File.symlink(target, link_path)
       end
     end
   end
