@@ -1,4 +1,7 @@
 require "./version"
+require "./generate"
+require "./repo_root"
+require "./filesystem"
 
 module Muninn
   # Command routing for the `muninn` binary.
@@ -43,10 +46,54 @@ module Muninn
       when "--version", "version"
         @stdout.puts "muninn #{VERSION}"
         0
+      when "generate"
+        handle_generate(args[1..])
       else
         @stderr.puts "muninn: unknown command '#{args.first}'. Run `muninn --help`."
         1
       end
+    end
+
+    # `muninn generate [--check] [--repo-root DIR]` (PRD §5.3). Argument parsing
+    # stays hand-rolled and small; the work lives in `Generate` behind an
+    # injected `Filesystem` so it is unit-testable without a subprocess.
+    private def handle_generate(args : Array(String)) : Int32
+      check = false
+      override : String? = nil
+
+      index = 0
+      while index < args.size
+        case arg = args[index]
+        when "--check"
+          check = true
+        when "--repo-root"
+          index += 1
+          value = args[index]?
+          return usage_error("--repo-root requires a directory") if value.nil?
+          override = value
+        else
+          return usage_error("unknown option '#{arg}'")
+        end
+        index += 1
+      end
+
+      root = override ? Path[override] : Muninn.find_repo_root(Path[Dir.current])
+      if root.nil?
+        @stderr.puts "muninn generate: no repository root found (looked for .git). Pass --repo-root."
+        return 1
+      end
+
+      fs = Filesystem::Real.new
+      if check
+        Generate.check(root, fs, @stdout, @stderr)
+      else
+        Generate.run(root, fs, @stdout, @stderr)
+      end
+    end
+
+    private def usage_error(message : String) : Int32
+      @stderr.puts "muninn generate: #{message}"
+      1
     end
   end
 end

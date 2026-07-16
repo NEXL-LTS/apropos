@@ -1,0 +1,47 @@
+require "../spec_helper"
+require "file_utils"
+
+# Exercises the one adapter that touches disk (Filesystem::Real). glob/read are
+# covered via Conventions.walk; here we cover the write-side additions used by
+# generate. Each example is self-contained in a temp dir.
+describe Muninn::Filesystem::Real do
+  it "writes a file, creating missing parent directories" do
+    dir = File.tempname("muninn-fs")
+    fs = Muninn::Filesystem::Real.new
+    begin
+      target = File.join(dir, "nested/deep/out.txt")
+      fs.write(target, "hello\n")
+      File.read(target).should eq("hello\n")
+    ensure
+      FileUtils.rm_rf(dir)
+    end
+  end
+
+  it "reads an existing file and returns nil for an absent one" do
+    dir = File.tempname("muninn-fs")
+    fs = Muninn::Filesystem::Real.new
+    begin
+      Dir.mkdir_p(dir)
+      present = File.join(dir, "there.txt")
+      File.write(present, "content\n")
+      fs.read?(present).should eq("content\n")
+      fs.read?(File.join(dir, "missing.txt")).should be_nil
+    ensure
+      FileUtils.rm_rf(dir)
+    end
+  end
+
+  it "removes a directory tree and is a no-op when the target is absent" do
+    dir = File.tempname("muninn-fs")
+    fs = Muninn::Filesystem::Real.new
+    begin
+      Dir.mkdir_p(File.join(dir, "skills/foo"))
+      File.write(File.join(dir, "skills/foo/SKILL.md"), "x\n")
+      fs.remove(File.join(dir, "skills/foo"))
+      Dir.exists?(File.join(dir, "skills/foo")).should be_false
+      fs.remove(File.join(dir, "skills/does-not-exist")) # no raise
+    ensure
+      FileUtils.rm_rf(dir)
+    end
+  end
+end

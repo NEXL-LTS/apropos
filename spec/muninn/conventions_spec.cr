@@ -15,6 +15,18 @@ private class FakeFS < Muninn::Filesystem
   def read(path : String) : String
     @files[path]
   end
+
+  def read?(path : String) : String?
+    @files[path]?
+  end
+
+  def write(path : String, content : String) : Nil
+    @files[path] = content
+  end
+
+  def remove(path : String) : Nil
+    @files.delete(path)
+  end
 end
 
 private def convention(frontmatter : String) : Muninn::Convention
