@@ -12,6 +12,13 @@ services:
       - ${HOME}/.ssh:/home/vscode/.ssh:ro
       - claude-data:/home/vscode/.claude
       - crystal-cache:/home/vscode/.cache/crystal
+    # kcov (the coverage gate) drives the spec binary under ptrace and calls
+    # personality() to disable ASLR. The default container sandbox blocks both,
+    # so `make coverage` needs these two relaxations (see the Dockerfile note).
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp:unconfined
     command: sleep infinity
 
 volumes:

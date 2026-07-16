@@ -7,10 +7,14 @@ on:
 
 # Refinement of PRD §7.3: the spec/lint/coverage job runs on ubuntu-latest via
 # the install-crystal action rather than the crystallang/crystal:alpine
-# container, because kcov (the coverage gate) installs cleanly from apt on
-# ubuntu but not on Alpine. The static musl build still uses Alpine — in
-# release.yml, via `docker run` (the Crystal Alpine image ships no Node, which
-# breaks JS-based Actions run *inside* a container).
+# container, because kcov (the coverage gate) needs a full glibc userland and
+# ptrace — neither of which the Alpine build image provides cleanly. Ubuntu
+# 24.04 (noble) DROPPED the `kcov` apt package, so kcov is built from a pinned
+# release here (mirroring .devcontainer/Dockerfile). GitHub's runner VM allows
+# ptrace + personality() without the seccomp relaxation the local devcontainer
+# needs. The static musl build still uses Alpine — in release.yml, via
+# `docker run` (the Crystal Alpine image ships no Node, which breaks JS-based
+# Actions run *inside* a container).
 
 jobs:
   test:
@@ -34,8 +38,20 @@ jobs:
       - name: Specs
         run: crystal spec
 
-      - name: Install coverage tooling
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends kcov jq
+      - name: Install coverage tooling (jq + kcov from source)
+        env:
+          KCOV_VERSION: v43
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            jq cmake binutils-dev libcurl4-openssl-dev libdw-dev libelf-dev libiberty-dev python3
+          git clone --depth 1 --branch "$KCOV_VERSION" \
+            https://github.com/SimonKagstrom/kcov.git /tmp/kcov
+          cmake -S /tmp/kcov -B /tmp/kcov/build \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local
+          cmake --build /tmp/kcov/build --parallel "$(nproc)"
+          sudo cmake --install /tmp/kcov/build
+          rm -rf /tmp/kcov
 
       - name: Coverage (100% line gate)
         run: ./scripts/coverage.sh

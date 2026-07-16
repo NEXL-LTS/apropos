@@ -56,6 +56,35 @@ RUN apt-get update -qq && \
     curl -fsSL https://crystal-lang.org/install.sh | bash && \
     rm -rf /var/lib/apt/lists/*
 
+# kcov — the coverage gate (PRD §8.2). Ubuntu 24.04 dropped the `kcov` package,
+# so it is built from a pinned release rather than installed from apt. python3
+# is needed only by kcov's build-time code generation; libdw/libcurl/binutils/elf
+# are its link- and run-time dependencies (kept so the built binary runs).
+#
+# Runtime note: kcov drives the target under ptrace and calls personality() to
+# disable ASLR, both of which the default container sandbox blocks. The
+# devcontainer therefore runs with cap_add SYS_PTRACE and seccomp:unconfined —
+# see .devcontainer/docker-compose.yml. Without those flags kcov fails with
+# "Can't set personality: Operation not permitted".
+ARG KCOV_VERSION=v43
+RUN apt-get update -qq && \
+    apt-get install -y --no-install-recommends \
+        binutils-dev \
+        cmake \
+        libcurl4-openssl-dev \
+        libdw-dev \
+        libelf-dev \
+        libiberty-dev \
+        python3 && \
+    rm -rf /var/lib/apt/lists/* && \
+    git clone --depth 1 --branch "${KCOV_VERSION}" \
+        https://github.com/SimonKagstrom/kcov.git /tmp/kcov && \
+    cmake -S /tmp/kcov -B /tmp/kcov/build \
+        -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local && \
+    cmake --build /tmp/kcov/build --parallel "$(nproc)" && \
+    cmake --install /tmp/kcov/build && \
+    rm -rf /tmp/kcov
+
 WORKDIR /workspace
 
 # Create user with matching UID/GID. Ubuntu 24.04 ships with a default
