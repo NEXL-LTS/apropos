@@ -1,0 +1,19 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+      args:
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-1000}
+    volumes:
+      - ..:/workspace:cached
+      - ${HOME}/.claude.json:/home/vscode/.claude.json
+      - ${HOME}/.ssh:/home/vscode/.ssh:ro
+      - claude-data:/home/vscode/.claude
+      - crystal-cache:/home/vscode/.cache/crystal
+    command: sleep infinity
+
+volumes:
+  claude-data:
+  crystal-cache:
