@@ -84,6 +84,14 @@ endif
 .PHONY: check
 check: lint spec ## Lint + spec (the fast local gate)
 
+# End-to-end test: stands up a sample repo wired with muninn's hooks and proves
+# muninn injects conventions and steers a real `claude` run. Local/advisory —
+# the live phases need the `claude` CLI + credentials and skip cleanly without
+# them, so this is intentionally NOT part of `check` or CI. See e2e/README.md.
+.PHONY: e2e
+e2e: ## Run the end-to-end test (needs claude CLI; skips live phases without it)
+	bash e2e/run.sh
+
 .PHONY: clean
 clean: ## Remove build artifacts and local caches
 	rm -rf bin lib .shards .crytic .cache coverage

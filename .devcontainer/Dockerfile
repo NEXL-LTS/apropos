@@ -85,6 +85,27 @@ RUN apt-get update -qq && \
     cmake --install /tmp/kcov/build && \
     rm -rf /tmp/kcov
 
+# bats-core — the shell test framework used by the end-to-end suite
+# (e2e/tests/*.bats). Installed from pinned releases: bats-core provides the
+# `bats` runner; the bats-support + bats-assert helper libraries are cloned into
+# the standard library dir and resolved at load time via BATS_LIB_PATH
+# (bats_load_library). Ubuntu ships an older bats without bats_load_library and
+# no helper libs, so it is installed from source like kcov above.
+ARG BATS_CORE_VERSION=v1.11.1
+ARG BATS_SUPPORT_VERSION=v0.3.0
+ARG BATS_ASSERT_VERSION=v2.1.0
+RUN git clone --depth 1 --branch "${BATS_CORE_VERSION}" \
+        https://github.com/bats-core/bats-core.git /tmp/bats-core && \
+    /tmp/bats-core/install.sh /usr/local && \
+    rm -rf /tmp/bats-core && \
+    mkdir -p /usr/local/lib/bats && \
+    git clone --depth 1 --branch "${BATS_SUPPORT_VERSION}" \
+        https://github.com/bats-core/bats-support.git /usr/local/lib/bats/bats-support && \
+    git clone --depth 1 --branch "${BATS_ASSERT_VERSION}" \
+        https://github.com/bats-core/bats-assert.git /usr/local/lib/bats/bats-assert && \
+    rm -rf /usr/local/lib/bats/*/.git
+ENV BATS_LIB_PATH=/usr/local/lib/bats
+
 WORKDIR /workspace
 
 # Create user with matching UID/GID. Ubuntu 24.04 ships with a default
