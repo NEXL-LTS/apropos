@@ -1,7 +1,7 @@
 require "../spec_helper"
 
-# The warm hook path (index present) must stay well under the 50 ms budget
-# (PRD §6). We assert the PRD's generous 4× ceiling (200 ms) to absorb
+# The warm hook path (index present) must stay well under the 50 ms budget.
+# We assert a generous 4× ceiling (200 ms) to absorb
 # runner noise, driving the logic in-process against a prebuilt 200-doc index
 # so it measures match + render, not compilation or disk.
 describe "Muninn::Hook performance" do

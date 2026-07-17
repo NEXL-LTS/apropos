@@ -11,8 +11,9 @@
 # global ~/.cache/crystal is not writable.
 /.cache/
 
-# On-demand crytic install for `make mutate` (advisory-only, never in CI — PRD §8.1)
+# On-demand crytic install for `make mutate` (advisory-only, never in CI)
 /.crytic/
 
 # coverage output
 /coverage/
+.cache/muninn/

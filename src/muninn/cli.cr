@@ -14,16 +14,15 @@ require "./filesystem"
 module Muninn
   # Command routing for the `muninn` binary.
   #
-  # At M0 only `--version` and `--help` are wired; every subcommand named in the
-  # usage text lands in a later milestone (PRD §9). All output goes through
-  # injected IO so the router is unit-testable without a subprocess.
+  # All output goes through injected IO so the router is unit-testable without a
+  # subprocess.
   class CLI
     USAGE = <<-USAGE
       muninn — deliver the right conventions to the right moment.
 
       Usage: muninn <command> [options]
 
-      Commands (see PRD §5; most land after M0):
+      Commands:
         init        Bootstrap the convention structure into a repo
         generate    Compile frontmatter into the index + skill wrappers
         hook pre    PreToolUse handler  (Layer 2, path-scoped)
@@ -78,7 +77,7 @@ module Muninn
       end
     end
 
-    # `muninn generate [--check] [--repo-root DIR]` (PRD §5.3). Argument parsing
+    # `muninn generate [--check] [--repo-root DIR]`. Argument parsing
     # stays hand-rolled and small; the work lives in `Generate` behind an
     # injected `Filesystem` so it is unit-testable without a subprocess.
     private def handle_generate(args : Array(String)) : Int32
@@ -131,7 +130,7 @@ module Muninn
     end
 
     # `muninn init [--force] [--example] [--claude-symlink] [--dry-run]
-    # [--repo-root DIR]` (PRD §5.1). An authoring command: fails *closed*.
+    # [--repo-root DIR]`. An authoring command: fails *closed*.
     private def handle_init(args : Array(String)) : Int32
       opts = InitArgs.new
       if code = parse_init_args(args, opts)
@@ -168,7 +167,7 @@ module Muninn
       nil
     end
 
-    # `muninn lint [--strict] [--repo-root DIR]` (PRD §5.8). CI command: fails
+    # `muninn lint [--strict] [--repo-root DIR]`. CI command: fails
     # *closed*.
     private def handle_lint(args : Array(String)) : Int32
       strict = false
@@ -195,7 +194,7 @@ module Muninn
       Lint.run(root, Filesystem::Real.new, strict, @stdout, @stderr)
     end
 
-    # `muninn doctor [--repo-root DIR]` (PRD §5.8).
+    # `muninn doctor [--repo-root DIR]`.
     private def handle_doctor(args : Array(String)) : Int32
       override : String? = nil
       index = 0
@@ -218,7 +217,7 @@ module Muninn
       Doctor.run(root, Filesystem::Real.new, Environment::Real.new, @stdout, @stderr)
     end
 
-    # `muninn hook pre|post [--repo-root DIR]` (PRD §5.4, §5.5). Claude Code
+    # `muninn hook pre|post [--repo-root DIR]`. Claude Code
     # invokes these with the payload on stdin. The whole family fails *open*: an
     # unknown subcommand or a bad `--repo-root` yields exit 0 with no output
     # rather than ever blocking an edit. All work lives in `Hook`.
@@ -254,7 +253,7 @@ module Muninn
     end
 
     # `muninn match [--format paths|json|full] [--stdin-content] <path> [...]`
-    # (PRD §5.6). A review/CI command: fails *closed* on a bad option or a
+    # . A review/CI command: fails *closed* on a bad option or a
     # malformed doc.
     private def handle_match(args : Array(String)) : Int32
       opts = MatchArgs.new
@@ -309,7 +308,7 @@ module Muninn
       nil
     end
 
-    # `muninn review [--format md|json] [<git-range>]` (PRD §5.6). Fails *closed*.
+    # `muninn review [--format md|json] [<git-range>]`. Fails *closed*.
     private def handle_review(args : Array(String)) : Int32
       format = "md"
       override : String? = nil

@@ -2,7 +2,7 @@
 
 Mutation testing hardens muninn's pure logic modules — the places where a
 surviving mutant means a real correctness gap: `matcher`, `frontmatter`,
-`index`, `session_state`, and `review` diff parsing (PRD §8.1).
+`index`, `session_state`, and `review` diff parsing.
 
 It is **advisory-only and never gates CI.** The actual quality floor is the 100%
 coverage gate plus ameba. Crytic is disposable: if a Crystal upgrade ever breaks

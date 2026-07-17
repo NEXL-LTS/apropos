@@ -1,9 +1,9 @@
 require "./errors"
 
 module Muninn
-  # The pure matching engine (PRD §5.2): path globs and content regexes. It is
+  # The pure matching engine: path globs and content regexes. It is
   # deliberately stateless — callers pass patterns and the target — so it is the
-  # heaviest mutation-testing target (PRD §8.1) without any I/O to stub.
+  # heaviest mutation-testing target without any I/O to stub.
   #
   # Windows-aware: path matching goes through `File.match?`, which normalizes
   # separators, rather than any hardcoded `/`.
@@ -11,7 +11,7 @@ module Muninn
     extend self
 
     # Raised when a `contents:` regex source fails to compile (PCRE2). Surfaced
-    # by lint (PRD §5.8); on the hook path the caller fails open.
+    # by lint; on the hook path the caller fails open.
     class Error < Muninn::Error
     end
 
@@ -36,7 +36,7 @@ module Muninn
       sources.any? { |source| content_match?(source, content) }
     end
 
-    # Is `pattern` a syntactically valid path glob? Surfaced by lint (PRD §5.8).
+    # Is `pattern` a syntactically valid path glob? Surfaced by lint.
     # `File.match?` only parses a pattern segment once the candidate path reaches
     # it, so we match against a structurally-identical sample built by neutralizing
     # the glob metacharacters — forcing every segment (including a malformed `[`

@@ -3,7 +3,7 @@ require "./errors"
 require "./filesystem"
 
 module Muninn
-  # `muninn init` (PRD §5.1): bootstrap the convention structure into a repo.
+  # `muninn init`: bootstrap the convention structure into a repo.
   # Idempotent — safe to re-run; a scaffold file is written only when absent
   # unless `--force` is given, and the `.claude/settings.json` and `.gitignore`
   # merges are additive (foreign keys and other hooks are preserved). `--dry-run`
@@ -25,7 +25,7 @@ module Muninn
       dry_run : Bool = false
 
     # muninn identifies its own settings entries by this command prefix, so a
-    # merge never duplicates a group it already installed (PRD §5.1).
+    # merge never duplicates a group it already installed.
     MUNINN_HOOK_PREFIX = "muninn hook"
 
     CACHE_IGNORE_ENTRY = ".cache/muninn/"
@@ -47,7 +47,7 @@ module Muninn
       create(repo_root, fs, options, stdout, "docs/conventions/workflows/.gitkeep", "")
       create(repo_root, fs, options, stdout, ".claude/skills/.gitkeep", SKILLS_GITKEEP)
       # The root file is the user's own Layer 1 content — never overwrite it, even
-      # under --force; only scaffold it when absent (PRD §5.1).
+      # under --force; only scaffold it when absent.
       create(repo_root, fs, options, stdout, "AGENTS.md", AGENTS_SKELETON, force_allowed: false)
     end
 

@@ -5,7 +5,7 @@ on:
     branches: [main]
   pull_request:
 
-# Refinement of PRD §7.3: the spec/lint/coverage job runs on ubuntu-latest via
+# The spec/lint/coverage job runs on ubuntu-latest via
 # the install-crystal action rather than the crystallang/crystal:alpine
 # container, because kcov (the coverage gate) needs a full glibc userland and
 # ptrace — neither of which the Alpine build image provides cleanly. Ubuntu
@@ -56,8 +56,17 @@ jobs:
       - name: Coverage (100% line gate)
         run: ./scripts/coverage.sh
 
-      - name: Unreachable-code check (paired with coverage — PRD §8.2)
+      - name: Unreachable-code check (paired with coverage)
         run: crystal tool unreachable src/muninn.cr
 
       - name: Release smoke build
         run: crystal build --release src/muninn.cr -o bin/muninn
+
+      # Self-check: the repo dogfoods the standard, so the built
+      # binary must find its own generated skill wrappers byte-identical and its
+      # own convention docs lint-clean. This is the drift gate against a
+      # hand-edited SKILL.md or a malformed rule doc landing on main.
+      - name: Self-check (generate --check && lint)
+        run: |
+          ./bin/muninn generate --check
+          ./bin/muninn lint

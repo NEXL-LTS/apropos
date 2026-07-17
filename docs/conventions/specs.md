@@ -10,7 +10,7 @@ example is deterministic and self-contained. Drive logic through injected IO
 glue with an integration spec that builds the binary once and runs it as a
 subprocess — unit specs cannot reach `exit`-at-top-level code.
 
-**Why:** The coverage gate is 100% of reachable lines (PRD §8.2). Logic that
+**Why:** The coverage gate is 100% of reachable lines. Logic that
 touches real IO or the process boundary is untestable in a unit spec and shows
 up as an uncovered line or a flaky example. Injecting IO makes error paths
 (unwritable cache, malformed stdin) unit-testable, and a single built-binary

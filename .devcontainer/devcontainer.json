@@ -15,5 +15,5 @@
       }
     }
   },
-  "postCreateCommand": "crystal --version && claude --version"
+  "postCreateCommand": "make deps && make install && crystal --version && claude --version && muninn --version"
 }

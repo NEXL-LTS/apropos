@@ -2,11 +2,11 @@ require "yaml"
 require "./conventions"
 
 module Muninn
-  # Skill wrapper generation (PRD §5.3): for every `skill: true` doc, emit a
+  # Skill wrapper generation: for every `skill: true` doc, emit a
   # `.claude/skills/<slug>/SKILL.md` whose frontmatter carries the doc's `name`
   # (its slug) and `description` verbatim, and whose body is a generated banner
   # plus a pointer back to the source doc. The wrappers are the one *committed*
-  # generated artifact, so their bytes must be stable (PRD §6) — the `--check`
+  # generated artifact, so their bytes must be stable — the `--check`
   # gate byte-compares them.
   module Skills
     extend self

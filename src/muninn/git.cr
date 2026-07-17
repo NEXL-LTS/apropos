@@ -1,8 +1,8 @@
 require "./errors"
 
 module Muninn
-  # The git boundary (PRD §8.2), used only by `review` (§5.6) — the one command
-  # allowed to shell out (§6). Kept to the three primitives review needs so the
+  # The git boundary, used only by `review` — the one command
+  # allowed to shell out. Kept to the three primitives review needs so the
   # range-resolution and diff-parsing logic can be unit-tested against a fake,
   # and `Real` stays a thin wrapper around the `git` process.
   abstract class Git

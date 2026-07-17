@@ -1,4 +1,4 @@
-# Muninn development tasks. See PRD §8 (quality strategy) and §9 (plan).
+# Muninn development tasks.
 #
 # Point the Crystal compile cache at a project-local, gitignored dir so every
 # target works regardless of whether the global ~/.cache/crystal is writable.
@@ -8,6 +8,10 @@ export CRYSTAL_CACHE_DIR
 
 CRYTIC_VERSION := ~> 9.0
 MUTATION_TARGETS := matcher frontmatter index session_state review
+
+# Where `make install` drops the binary. Default to the per-user bin dir that is
+# already on PATH in the devcontainer; override with `make install PREFIX=/usr/local`.
+PREFIX ?= $(HOME)/.local
 
 .DEFAULT_GOAL := help
 
@@ -28,6 +32,12 @@ build: ## Build the muninn binary (debug)
 release: ## Build the muninn binary (release)
 	crystal build --release src/muninn.cr -o bin/muninn
 
+.PHONY: install
+install: release ## Build the release binary and install it to PREFIX/bin (on PATH)
+	@mkdir -p "$(PREFIX)/bin"
+	install -m 0755 bin/muninn "$(PREFIX)/bin/muninn"
+	@echo ">> installed muninn to $(PREFIX)/bin/muninn"
+
 .PHONY: spec
 spec: ## Run the spec suite
 	crystal spec
@@ -40,7 +50,7 @@ lint: ## Run ameba (zero findings required)
 coverage: ## Run specs under kcov and enforce the coverage gate
 	./scripts/coverage.sh
 
-# Mutation testing is advisory-only and never gates CI (PRD §8.1). Crytic is
+# Mutation testing is advisory-only and never gates CI. Crytic is
 # installed on demand into the gitignored .crytic/ so it stays out of the main
 # dependency graph. If it fails to build against the target Crystal, this target
 # prints the manual-mutation checklist instead of failing.
@@ -52,14 +62,14 @@ coverage: ## Run specs under kcov and enforce the coverage gate
 mutate: .crytic/bin/crytic ## Run crytic on SUBJECT=<file> (advisory; see docs/mutation-testing.md)
 ifndef SUBJECT
 	@echo "Usage: make mutate SUBJECT=src/muninn/<module>.cr"
-	@echo "Recommended mutation targets (pure logic — PRD §8.1):"
+	@echo "Recommended mutation targets (pure logic):"
 	@for m in $(MUTATION_TARGETS); do echo "  src/muninn/$$m.cr"; done
 else
 	./.crytic/bin/crytic test -s $(SUBJECT)
 endif
 
 # Build crytic on demand. On failure, fall back to the documented manual
-# mutation workflow (PRD §8.1) rather than breaking the developer's build.
+# mutation workflow rather than breaking the developer's build.
 .crytic/bin/crytic:
 	@echo ">> installing crytic ($(CRYTIC_VERSION)) into .crytic/ ..."
 	@mkdir -p .crytic

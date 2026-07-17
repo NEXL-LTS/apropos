@@ -1,13 +1,13 @@
 module Muninn
   # Shared rendering of matched convention bodies into injectable/pasteable text
-  # (PRD §5.4, §5.6). The hook runtime and `match --format full` must produce the
+  # . The hook runtime and `match --format full` must produce the
   # *same* concatenation, so the logic lives here once: `Convention (path):`
   # headers, an over-cap summarized fallback, and the 10k character budget.
   module Rendering
     extend self
 
     # Total injected text stays under this; over it, fall back to headers + first
-    # paragraph + a read-the-file instruction rather than spilling (PRD §5.4).
+    # paragraph + a read-the-file instruction rather than spilling.
     CHAR_CAP = 10_000
 
     # Between rule blocks. A visible rule so concatenated conventions stay

@@ -11,7 +11,7 @@ private DB_DOC     = "---\ncontents: ['\\btransaction\\b']\n---\n# DB\n\nUse tra
 private MODELS_DOC = "---\npaths: [\"app/**\"]\ncontents: ['\\bupdate_all\\b']\n---\n# Models\n\nAvoid update_all.\n"
 
 # A filesystem that rejects writes, so the persist-index and dedup-save paths
-# must degrade gracefully (PRD §6 fail open).
+# must degrade gracefully.
 private class ReadOnlyFS < InMemoryFS
   def write(path : String, content : String) : Nil
     raise "read-only filesystem"

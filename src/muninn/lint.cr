@@ -6,7 +6,7 @@ require "./skills"
 require "./filesystem"
 
 module Muninn
-  # `muninn lint` (PRD §5.8): validate the convention structure against the
+  # `muninn lint`: validate the convention structure against the
   # standard's quality bar and exit non-zero on any error. It is a CI command, so
   # it fails **closed** — but it reports *every* problem it can find rather than
   # stopping at the first, so a malformed doc becomes a finding, not a crash.
@@ -17,7 +17,7 @@ module Muninn
     SKILLS_DIR      = ".claude/skills"
     ROOT_FILES      = {"AGENTS.md", "CLAUDE.md"}
 
-    # Line budgets (PRD §5.8): a root file over 150 lines or a skill doc over 500
+    # Line budgets: a root file over 150 lines or a skill doc over 500
     # lines is a warning (`--strict` promotes warnings to errors).
     ROOT_FILE_MAX = 150
     SKILL_DOC_MAX = 500
@@ -112,7 +112,7 @@ module Muninn
     end
 
     # Generated skill wrappers must byte-match what the current docs produce — the
-    # same check as `generate --check` (PRD §5.8). A slug collision or missing
+    # same check as `generate --check`. A slug collision or missing
     # description makes the whole wrapper set undecidable, so it is reported as a
     # single error and drift comparison is skipped.
     private def wrapper_findings(repo_root : Path, fs : Filesystem,

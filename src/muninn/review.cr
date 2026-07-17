@@ -7,7 +7,7 @@ require "./rendering"
 require "./git"
 
 module Muninn
-  # The review-agent interface (PRD §5.6): `match` resolves the conventions that
+  # The review-agent interface: `match` resolves the conventions that
   # apply to given paths (Layer 2 by path, Layer 3 by on-disk or stdin content),
   # and `review` resolves them for a git range (Layer 2 by path, Layer 3 by the
   # diff's *added* lines) and emits a checklist manifest harvesting each rule's
@@ -21,7 +21,7 @@ module Muninn
     INDEX_RELATIVE = Path[".cache", "muninn", "index.json"]
 
     # Default-branch probes when `review` gets no explicit range, tried after the
-    # authoritative `origin/HEAD` symbolic ref (open question §11.3).
+    # authoritative `origin/HEAD` symbolic ref.
     DEFAULT_BASE_CANDIDATES = %w[origin/main origin/master main master]
 
     # One convention that applies to a file, with the specific triggers hit and
@@ -47,7 +47,7 @@ module Muninn
       end
     end
 
-    # `muninn match <path> [...paths]` (PRD §5.6). `stdin_content`, when given,
+    # `muninn match <path> [...paths]`. `stdin_content`, when given,
     # replaces the on-disk content for the (single) path so a proposed patch can
     # be tested.
     def match(repo_root : Path, fs : Filesystem, paths : Array(String),
@@ -63,7 +63,7 @@ module Muninn
       1
     end
 
-    # `muninn review [<git-range>]` (PRD §5.6). Resolves the range (default:
+    # `muninn review [<git-range>]`. Resolves the range (default:
     # merge-base with the default branch), then matches each changed file's path
     # and added lines.
     def run(repo_root : Path, fs : Filesystem, git : Git, range : String?,
@@ -81,7 +81,7 @@ module Muninn
     end
 
     # Walk the docs (the fresh source of truth) and opportunistically rebuild the
-    # index when missing or stale (PRD §5.6). Matching uses the walked
+    # index when missing or stale. Matching uses the walked
     # conventions directly, so a failed index write is non-fatal.
     private def load_conventions(repo_root : Path, fs : Filesystem) : Array(Convention)
       list = Conventions.walk(repo_root, fs)
@@ -110,7 +110,7 @@ module Muninn
     end
 
     # Resolve how (if at all) `convention` applies to `relative`+`content`. A doc
-    # is Layer 2 or Layer 3, never both (§5.2), so at most one branch fires.
+    # is Layer 2 or Layer 3, never both, so at most one branch fires.
     private def rule_for(convention : Convention, relative : String, content : String?) : RuleMatch?
       fm = convention.frontmatter
       if convention.layer2? && convention.triggers_for_path?(relative)
@@ -149,7 +149,7 @@ module Muninn
     end
 
     # Parse a unified diff into `{new_path, added_lines}` per changed file, in
-    # order of appearance (PRD §5.6, a mutation-testing target — §8.1). Only
+    # order of appearance. Only
     # added lines within hunks are collected; deletions (`+++ /dev/null`) are
     # skipped.
     private def parse_diff(diff : String) : Array({String, String})

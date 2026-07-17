@@ -6,7 +6,7 @@ require "./environment"
 require "./filesystem"
 
 module Muninn
-  # `muninn doctor` (PRD §5.8): check the environment so a user can tell *why*
+  # `muninn doctor`: check the environment so a user can tell *why*
   # hooks aren't firing. It inspects the settings wiring, whether `muninn` and a
   # new-enough Claude Code are on PATH, index freshness, and cache writability.
   # All host access is injected (a `Filesystem` and an `Environment`) so every
@@ -21,7 +21,7 @@ module Muninn
     MUNINN_HOOK_PREFIX = "muninn hook"
 
     # The minimum Claude Code version known to support PreToolUse
-    # `additionalContext` (PRD §5.4). Older CLIs degrade Layer 2 to PostToolUse.
+    # `additionalContext`. Older CLIs degrade Layer 2 to PostToolUse.
     MIN_CLAUDE_VERSION = "1.0.0"
 
     # One environment check: `:ok`, `:warn` (advisory), or `:fail` (exit 1).
