@@ -86,5 +86,8 @@ case ":$PATH:" in
      echo "     export PATH=\"$BIN_DIR:\$PATH\"" ;;
 esac
 
-"$BIN_DIR/muninn" --version || true
+# Fail closed: a binary that can't execute (wrong arch, noexec mount, corruption)
+# is a broken install, not a success — surface it rather than exiting 0.
+"$BIN_DIR/muninn" --version \
+  || die "installed binary at $BIN_DIR/muninn failed to run — the install is broken (wrong architecture, a noexec mount, or a corrupt download)."
 echo ">> done. Run 'muninn help' for the mental model, or 'muninn init' to bootstrap a repo."

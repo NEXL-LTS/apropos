@@ -31,7 +31,7 @@ Windows are on the roadmap.
 From source (requires [Crystal](https://crystal-lang.org) ≥ 1.20):
 
 ```sh
-make install          # builds the release binary and drops it on your PATH
+make install          # builds the release binary into $PREFIX/bin (default ~/.local/bin)
 ```
 
 ## Quickstart
