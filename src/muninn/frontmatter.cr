@@ -2,10 +2,10 @@ require "yaml"
 require "./errors"
 
 module Muninn
-  # Parsed YAML frontmatter from a convention doc (PRD §5.2). This layer
+  # Parsed YAML frontmatter from a convention doc. This layer
   # validates the *shape* of the frontmatter only — the types of the known
   # keys. Semantic rules (e.g. `skill: true` requires a `description` that
-  # starts with "Use when") are the linter's job (PRD §5.8), not this parser's,
+  # starts with "Use when") are the linter's job, not this parser's,
   # so the model stays reusable by every command.
   struct Frontmatter
     # Raised when a frontmatter block is structurally invalid: malformed YAML,
@@ -37,14 +37,14 @@ module Muninn
     end
 
     # A doc with neither a path nor a content trigger and no skill flag is
-    # reference-only: reachable by link, never injected (PRD §5.2).
+    # reference-only: reachable by link, never injected.
     def reference_only? : Bool
       paths.empty? && contents.empty? && !skill?
     end
 
     # Split raw doc text into `{frontmatter, body}`. A doc without a leading
     # fence has no frontmatter and its whole text is the body. Body bytes are
-    # preserved exactly (byte-stable output is a hard requirement — PRD §6).
+    # preserved exactly (byte-stable output is a hard requirement).
     def self.split(text : String) : {Frontmatter?, String}
       open = text.match(OPEN_FENCE)
       return {nil, text} unless open

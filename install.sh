@@ -24,7 +24,7 @@ die() {
 
 # --- Platform gate -----------------------------------------------------------
 # v1 ships a fully static Linux x86_64 binary only. macOS and Windows are on the
-# roadmap (PRD §7.3); until their release legs are enabled, build from source.
+# roadmap; until their release legs are enabled, build from source.
 os="$(uname -s)"
 arch="$(uname -m)"
 [ "$os" = "Linux" ] || die "unsupported OS '$os'; v1 ships a Linux x86_64 binary only (build from source: make install)."

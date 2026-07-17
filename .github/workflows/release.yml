@@ -4,7 +4,7 @@ on:
   push:
     tags: ["v*"]
 
-# Written as a matrix from day one with only the Linux leg enabled (PRD §7.3).
+# Written as a matrix from day one with only the Linux leg enabled.
 # Roadmap legs (disabled until their own CI is green):
 #   - macOS arm64/x86_64 (dynamic against system libs; macOS has no static libc)
 #   - Windows x86_64 (Crystal Windows support is Preview — no production promise)

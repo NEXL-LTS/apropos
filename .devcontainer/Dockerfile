@@ -56,7 +56,7 @@ RUN apt-get update -qq && \
     curl -fsSL https://crystal-lang.org/install.sh | bash && \
     rm -rf /var/lib/apt/lists/*
 
-# kcov — the coverage gate (PRD §8.2). Ubuntu 24.04 dropped the `kcov` package,
+# kcov — the coverage gate. Ubuntu 24.04 dropped the `kcov` package,
 # so it is built from a pinned release rather than installed from apt. python3
 # is needed only by kcov's build-time code generation; libdw/libcurl/binutils/elf
 # are its link- and run-time dependencies (kept so the built binary runs).

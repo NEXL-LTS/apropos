@@ -2,7 +2,7 @@ require "json"
 require "./filesystem"
 
 module Muninn
-  # Per-session dedup store (PRD §5.7): the set of rule-file paths already
+  # Per-session dedup store: the set of rule-file paths already
   # injected during a Claude Code session, so a rule is delivered at most once
   # per session. Persisted as JSON at `.cache/muninn/sessions/<session_id>.json`
   # with an `updated_at` stamp used to prune stale files opportunistically.
@@ -16,7 +16,7 @@ module Muninn
     MAX_AGE = 7.days
 
     # The on-disk shape. Kept minimal so a lost concurrent update costs at most
-    # one duplicate injection (PRD §5.7).
+    # one duplicate injection.
     struct Document
       include JSON::Serializable
 
@@ -34,7 +34,7 @@ module Muninn
     end
 
     # Load the state for `session_id`. A missing or unparseable file is treated
-    # as an empty state (fail open — PRD §6). A nil `session_id` means dedup is
+    # as an empty state (fail open). A nil `session_id` means dedup is
     # unavailable, so every rule is considered new.
     def self.load(repo_root : Path, fs : Filesystem, session_id : String?) : SessionState
       return new unless session_id

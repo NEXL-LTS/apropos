@@ -2,12 +2,12 @@ require "json"
 require "./conventions"
 
 module Muninn
-  # The trigger index (PRD §5.3): a compiled, serialized view of every
+  # The trigger index: a compiled, serialized view of every
   # convention doc so the hot hook path never parses YAML. Persisted as
   # deterministic JSON at `.cache/muninn/index.json` and rebuilt only when a
   # doc's content hash changes (or the index is absent / a different schema
   # version). This module owns build, (de)serialization, and the staleness
-  # decision — a mutation-testing target (PRD §8.1).
+  # decision — a mutation-testing target.
   struct Index
     # Bump when the entry shape changes; a mismatch forces a rebuild so an old
     # index is never trusted after an upgrade.
@@ -65,14 +65,14 @@ module Muninn
     end
 
     # Build a fresh index from parsed conventions. Doc order is preserved (the
-    # walk is already sorted — PRD §6), so serialization is byte-stable.
+    # walk is already sorted), so serialization is byte-stable.
     def self.build(conventions : Array(Convention)) : Index
       new(conventions.map { |convention| Entry.from(convention) })
     end
 
     # Parse a stored index. Returns nil on malformed JSON or a schema-version
     # mismatch, so callers treat a corrupt or outdated index identically to a
-    # missing one (rebuild — PRD §5.3).
+    # missing one (rebuild).
     def self.load(json : String) : Index?
       index = from_json(json)
       return nil unless index.schema_version == SCHEMA_VERSION
@@ -83,7 +83,7 @@ module Muninn
 
     # Does this stored index already reflect exactly these docs — same set of
     # paths, each with an unchanged content hash? Staleness is defined purely by
-    # the doc set and content hashes (PRD §5.3); a difference means rebuild.
+    # the doc set and content hashes; a difference means rebuild.
     def covers?(conventions : Array(Convention)) : Bool
       docs.map { |entry| {entry.path, entry.hash} } ==
         conventions.map { |convention| {convention.path, convention.hash} }

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Run the spec suite under kcov and enforce a line-coverage gate.
 #
-# Plain kcov has no built-in threshold flag (PRD §8.2), so this script reads the
+# Plain kcov has no built-in threshold flag, so this script reads the
 # percentage back from kcov's coverage.json and fails below the threshold.
 #
 # The thin binary entry point (src/muninn.cr) is excluded from the line count:
 # it is a single delegating line, driven end-to-end by the integration specs as
 # a subprocess (which kcov cannot instrument), so counting it would be
-# misleading. This is the one documented, reviewed exclusion (PRD §8.2).
+# misleading. This is the one documented, reviewed exclusion.
 set -euo pipefail
 
 THRESHOLD="${COVERAGE_THRESHOLD:-100}"

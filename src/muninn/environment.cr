@@ -1,5 +1,5 @@
 module Muninn
-  # The process/PATH boundary (PRD §8.2), used by `doctor` to inspect the host.
+  # The process/PATH boundary, used by `doctor` to inspect the host.
   # Isolating executable lookup and version probing behind an injectable adapter
   # keeps doctor's logic unit-testable with a fake while `Real` is the only code
   # that touches `Process`.

@@ -1,12 +1,12 @@
 # muninn
 
 Muninn is a single deterministic binary that delivers the right documentation to
-the right moment. It implements the Agent Documentation Structure Standard
-(`agent-docs-structure.md`): it compiles convention-doc frontmatter into a
+the right moment. It implements a layered documentation structure (defined in
+`docs/conventions/README.md`): it compiles convention-doc frontmatter into a
 trigger index, generates skill wrappers, serves as a Claude Code hook handler
 that injects path- and construct-scoped rules at edit time, and resolves the
 conventions that apply to a diff for review. Written in Crystal; ships as a
-static Linux binary. See `PRD.md` for the full spec and milestone plan.
+static Linux binary. See `README.md` for the user-facing overview.
 
 ## Commands
 

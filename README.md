@@ -2,18 +2,20 @@
 
 **Deliver the right documentation to the right moment.**
 
-Muninn is a single deterministic binary that implements the [Agent Documentation
-Structure Standard](./agent-docs-structure.md): it compiles convention-doc
+Muninn ("memory") is one of Odin's two ravens: it flies out over the world,
+gathers what is true, and whispers it into Odin's ear at the right moment — which
+is what this tool does with your conventions. It is a single deterministic binary
+that keeps a layered documentation structure working: it compiles convention-doc
 frontmatter into a trigger index, generates skill wrappers, serves as a Claude
 Code hook handler that injects path- and construct-scoped rules at edit time, and
 resolves the conventions that apply to a diff for review.
 
 One large always-loaded instruction file gets skimmed and forgotten. Muninn keeps
-the guidance small and just-in-time: rules live in `docs/conventions/` as markdown
-with YAML frontmatter, and muninn delivers each one exactly when the file or
-construct it governs is being touched. It makes no LLM calls — triggering is
-deterministic — and ships as a static Linux binary. See [`PRD.md`](./PRD.md) for
-the full specification.
+the guidance small and just-in-time: rules live in
+[`docs/conventions/`](./docs/conventions/) as markdown with YAML frontmatter, and
+muninn delivers each one exactly when the file or construct it governs is being
+touched. It makes no LLM calls — triggering is deterministic — and ships as a
+static Linux binary.
 
 ## Install
 
@@ -50,6 +52,24 @@ Code calls them, and they inject the matching conventions as context.
 Run `muninn help` for the full mental model (also `muninn help --format json` for
 the machine-readable form, or `muninn help <command>`).
 
+## How it works
+
+Guidance is organized into four layers, each triggered by the cheapest mechanism
+that reliably fires it — see [`docs/conventions/README.md`](./docs/conventions/README.md)
+for the full model:
+
+| Layer | For | Trigger | Delivered by |
+| --- | --- | --- | --- |
+| 1 Root file | Universal rules | Always loaded | `AGENTS.md` |
+| 2 Path-scoped | A directory / file type | File **path** | PreToolUse hook |
+| 3 Construct-scoped | An API / code construct | Written **content** (regex) | PostToolUse hook |
+| 4 Intent skills | Task-nature guidance | Semantic skill match | Generated `SKILL.md` |
+
+`muninn generate` compiles the frontmatter in `docs/conventions/` into a cached
+trigger index and committed skill wrappers. At edit time, the hooks look up the
+matching rules and inject them. For review, the same frontmatter resolves which
+conventions apply to a diff, so review prompts carry zero copies of the rules.
+
 ## Claude Code version requirement
 
 Layer 2 delivery fires on **PreToolUse**, which depends on Claude Code supporting
@@ -78,6 +98,35 @@ PostToolUse path, so **older Claude Code releases may not inject Layer 2 context
 
 Every command takes `--help`, `--repo-root <dir>` (default: walk up to the nearest
 `.git`), and documents its exit codes.
+
+## Design guarantees
+
+- **Fast hooks.** `hook pre`/`hook post` complete in well under 50 ms warm (index
+  present); the hot path never parses YAML. A benchmark spec guards the budget.
+- **Deterministic output.** `generate` is byte-stable across runs and platforms
+  (sorted walks, LF endings, no timestamps) — the prerequisite for `--check`.
+- **Fail-open hooks, fail-closed CI.** A hook never blocks or breaks an edit; on
+  any internal error it exits 0 and emits nothing. `generate --check` and `lint`
+  exit non-zero on any violation.
+- **No runtime dependencies.** A fully static musl binary; the only shell-out off
+  the hook path is optional `git` for `review`.
+
+## Non-goals (v1)
+
+- No Cursor `.mdc` / Copilot `.instructions.md` output — the frontmatter is
+  designed so these are pure additional emitters later.
+- No enforcement of code style — that belongs in linters/formatters, which muninn
+  does not replace.
+- No LLM calls; no daemon/watch mode (every invocation is a fast one-shot).
+- No hook management beyond its own entries: muninn edits only the hook entries it
+  owns in `.claude/settings.json`, marked and idempotent.
+
+## Roadmap
+
+macOS (arm64/x86_64) and Windows release legs; `--redup-after N` for re-injecting
+a rule every N edits; Cursor/Copilot emitters from the same frontmatter; advisory
+lint-rule linkage (teaching messages that cite rule files); a `review` posting mode
+for CI (GitHub PR comments).
 
 ## Development
 

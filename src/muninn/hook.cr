@@ -10,14 +10,14 @@ require "./rendering"
 require "./hooks/payload"
 
 module Muninn
-  # The Claude Code hook runtime (PRD §5.4, §5.5). `pre` delivers Layer 2
+  # The Claude Code hook runtime. `pre` delivers Layer 2
   # (path-scoped) guidance on PreToolUse; `post` delivers Layer 3
   # (construct-scoped) guidance on PostToolUse. Both read the trigger index (the
-  # hot path never parses YAML — PRD §6), match against it, dedup per session,
+  # hot path never parses YAML), match against it, dedup per session,
   # render the matched rule bodies under a character cap, and emit the
   # `additionalContext` envelope.
   #
-  # Everything here fails **open** (PRD §6): any internal error exits 0 and
+  # Everything here fails **open**: any internal error exits 0 and
   # emits nothing, so a conventions tool can never block or break an edit. All
   # I/O is injected (filesystem, stdin/stdout IO, clock) so every path is
   # unit-testable.
@@ -93,7 +93,7 @@ module Muninn
     end
 
     # Layer 3: any content-scoped rule whose regex matches the written content;
-    # when the rule also declares `paths`, the path must match too (AND — §5.5).
+    # when the rule also declares `paths`, the path must match too (AND).
     private def match_post(index : Index, payload : Payload, root : Path,
                            fs : Filesystem, relative : String) : Array(Index::Entry)
       content = post_content(payload, root, fs, relative)
@@ -108,7 +108,7 @@ module Muninn
 
     # The content to match Layer 3 against: the payload's written pieces joined,
     # or — when the payload carries no content field — the file read from disk
-    # (the drift-tolerant fallback of PRD §5.5).
+    # (the drift-tolerant fallback).
     private def post_content(payload : Payload, root : Path, fs : Filesystem,
                              relative : String) : String?
       pieces = payload.written_contents
@@ -119,7 +119,7 @@ module Muninn
     # Read the index; rebuild it in-memory (and best-effort persist) when it is
     # absent, corrupt, or a stale schema version. Freshness against changed docs
     # is *not* checked here — that would re-walk every doc and blow the warm
-    # latency budget (PRD §6); `generate` owns keeping the index current.
+    # latency budget; `generate` owns keeping the index current.
     private def load_or_build_index(root : Path, fs : Filesystem) : Index
       json = fs.read?(root.join(INDEX_RELATIVE).to_s)
       if json && (index = Index.load(json))
@@ -138,7 +138,7 @@ module Muninn
     end
 
     # Read each matched rule's body (frontmatter stripped) and render them under
-    # `Convention (path):` headers, applying the shared cap strategy (PRD §5.4).
+    # `Convention (path):` headers, applying the shared cap strategy.
     private def build_context(root : Path, fs : Filesystem, entries : Array(Index::Entry)) : String
       docs = entries.compact_map do |entry|
         text = fs.read?(root.join(entry.path).to_s)
@@ -178,7 +178,7 @@ module Muninn
       path.absolute? ? path.relative_to(root).to_posix.to_s : path.to_posix.to_s
     end
 
-    # Best-effort `--verbose` diagnostics (PRD §5.4). Silent unless verbose, and
+    # Best-effort `--verbose` diagnostics. Silent unless verbose, and
     # never raises — it is on the fail-open path.
     private def log_failure(fs : Filesystem, override_root : String?, verbose : Bool, ex : Exception) : Nil
       return unless verbose

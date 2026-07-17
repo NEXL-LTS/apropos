@@ -4,8 +4,8 @@ require "./matcher"
 require "./filesystem"
 
 module Muninn
-  # One parsed convention doc (PRD §5.2): its repo-relative path, a content hash
-  # for staleness detection (PRD §5.3), the parsed frontmatter, and the body.
+  # One parsed convention doc: its repo-relative path, a content hash
+  # for staleness detection, the parsed frontmatter, and the body.
   # Layer classification and trigger decisions are derived here so the AND
   # semantics live in exactly one tested place.
   struct Convention
@@ -27,7 +27,7 @@ module Muninn
     end
 
     # Layer 2: path-scoped. Fires on any edit to a matching path. A doc that
-    # also declares `contents` is path-scoped Layer 3, not Layer 2 (PRD §5.2).
+    # also declares `contents` is path-scoped Layer 3, not Layer 2.
     def layer2? : Bool
       !frontmatter.paths.empty? && frontmatter.contents.empty?
     end
@@ -42,7 +42,7 @@ module Muninn
       frontmatter.skill?
     end
 
-    # The text under an optional `## Verify` heading in the body (PRD §5.2),
+    # The text under an optional `## Verify` heading in the body,
     # harvested by `review` as checklist criteria. The section runs until the next
     # heading (any level) or end of doc. Returns nil when absent or empty.
     def verify : String?
@@ -62,7 +62,7 @@ module Muninn
       text.empty? ? nil : text
     end
 
-    # Reference-only: reachable by link, never triggered (PRD §5.2).
+    # Reference-only: reachable by link, never triggered.
     def reference_only? : Bool
       !layer2? && !layer3? && !skill?
     end
@@ -73,8 +73,7 @@ module Muninn
     end
 
     # PostToolUse decision: does this Layer 3 rule apply to written `content`?
-    # When the rule also declares `paths`, the file path must match too (AND —
-    # PRD §5.5).
+    # When the rule also declares `paths`, the file path must match too (AND).
     def triggers_for_content?(relative_path : String, content : String) : Bool
       return false unless layer3?
       return false unless Matcher.any_content_match?(frontmatter.contents, content)
@@ -82,9 +81,9 @@ module Muninn
     end
   end
 
-  # Discovers and parses every convention doc in a repo (PRD §5.3). All disk
+  # Discovers and parses every convention doc in a repo. All disk
   # access goes through an injected `Filesystem`; the walk is sorted so the
-  # resulting order is byte-stable across platforms (PRD §6).
+  # resulting order is byte-stable across platforms.
   module Conventions
     extend self
 

@@ -1,6 +1,6 @@
 require "../../spec_helper"
 
-# Contract test for the captured hook payloads (PRD §8.4): these fixtures — not
+# Contract test for the captured hook payloads: these fixtures — not
 # prose — are the authoritative record of the `tool_input` field names. If an
 # upstream rename breaks parsing, the re-captured fixture is where the truth is
 # updated and these assertions catch the drift.

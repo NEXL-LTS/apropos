@@ -2,11 +2,11 @@ require "json"
 
 module Muninn
   module Hook
-    # The Claude Code hook input contract (PRD §5.4, §5.5). Parsing is
+    # The Claude Code hook input contract. Parsing is
     # deliberately *tolerant*: every field is optional, unknown keys are ignored,
     # and malformed JSON yields nil rather than raising — the hook path must fail
-    # open (PRD §6), and the field names are the part of the contract most
-    # exposed to upstream schema drift (PRD §8.4). The captured fixtures under
+    # open, and the field names are the part of the contract most
+    # exposed to upstream schema drift. The captured fixtures under
     # `spec/fixtures/hook_payloads/` — not this struct — are the authoritative
     # record of the field names; this parser just follows them.
     struct Payload
@@ -18,7 +18,7 @@ module Muninn
       getter tool_input : ToolInput?
 
       # One entry of a batch-edit tool input (a `MultiEdit`-style shape, absent
-      # in some Claude Code versions — PRD §5.5). Only its `new_string` matters
+      # in some Claude Code versions). Only its `new_string` matters
       # for Layer 3 content matching.
       struct Edit
         include JSON::Serializable
@@ -50,7 +50,7 @@ module Muninn
       # Every piece of written content the payload exposes for Layer 3 matching:
       # a Write's `content`, an Edit's `new_string`, and each `new_string` of a
       # batch edit. Empty when none is present (the caller then reads the file
-      # from disk — PRD §5.5).
+      # from disk).
       def written_contents : Array(String)
         input = tool_input
         return [] of String unless input

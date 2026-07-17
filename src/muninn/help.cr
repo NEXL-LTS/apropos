@@ -1,7 +1,7 @@
 require "json"
 
 module Muninn
-  # `muninn help` (PRD §5.9): the dual-audience mental-model explainer, distinct
+  # `muninn help`: the dual-audience mental-model explainer, distinct
   # from the terse `--help` flag output. One in-binary source of content renders
   # to both prose (`muninn help`) and JSON (`muninn help --format json`) so the
   # two can never drift, and `muninn help <command>` prints the mental-model
@@ -88,8 +88,8 @@ module Muninn
                  "fact. Follow it, or explain why in your response. Each injection " \
                  "cites its source doc path so you can read the full rule."
 
-    LEARN_MORE = "Learn more in docs/conventions/README.md and the Agent " \
-                 "Documentation Structure Standard (agent-docs-structure.md)."
+    LEARN_MORE = "Learn more in docs/conventions/README.md, which defines the " \
+                 "layered documentation structure and how to author rules."
 
     # Entry point for `muninn help [<command>] [--format json]`. Always exits 0.
     def run(args : Array(String), stdout : IO) : Int32
@@ -117,7 +117,7 @@ module Muninn
       0
     end
 
-    # The full prose explainer (PRD §5.9), wrapping-friendly and degrading
+    # The full prose explainer, wrapping-friendly and degrading
     # cleanly when piped (no ANSI).
     def text(io : IO) : Nil
       io << "muninn — deliver the right documentation to the right moment.\n\n"
@@ -139,7 +139,7 @@ module Muninn
       io << LEARN_MORE << '\n'
     end
 
-    # The same content as structured JSON (PRD §5.9): `what`, `why`, `layers[]`,
+    # The same content as structured JSON: `what`, `why`, `layers[]`,
     # `paths{}`, `commands[]`, `agent_note`. Kept in lockstep with `text`.
     def json(io : IO) : Nil
       JSON.build(io, indent: "  ") do |json|

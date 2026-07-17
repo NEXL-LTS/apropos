@@ -4,7 +4,7 @@ require "./skills"
 require "./filesystem"
 
 module Muninn
-  # `muninn generate` (PRD §5.3): compile `docs/conventions/**` into the trigger
+  # `muninn generate`: compile `docs/conventions/**` into the trigger
   # index and the committed skill wrappers, and prune orphaned wrappers. `run`
   # writes; `check` never writes and is the CI drift gate. Both fail *closed* —
   # a malformed doc or slug collision exits non-zero — because generate is an
@@ -32,7 +32,7 @@ module Muninn
     end
 
     # Verify the committed skill wrappers byte-match what the current docs
-    # produce and that no orphaned wrappers linger (PRD §5.3). Writes nothing.
+    # produce and that no orphaned wrappers linger. Writes nothing.
     # Exit 0 when clean, 1 with a drift summary otherwise.
     def check(repo_root : Path, fs : Filesystem, stdout : IO, stderr : IO) : Int32
       conventions = Conventions.walk(repo_root, fs)
