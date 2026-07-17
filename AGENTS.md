@@ -34,5 +34,6 @@ even where the global Crystal cache is not writable.
 
 Task- and file-scoped conventions are **not** in this file. They live in
 `docs/conventions/` and are surfaced automatically at edit time by muninn's own
-hooks (during bootstrap, by the interim `.claude/hooks/inject-rules.sh`). Read
-`docs/conventions/README.md` for how the layers and frontmatter work.
+hooks (`muninn hook pre`/`muninn hook post`, wired in `.claude/settings.json`;
+run `make install` so they resolve on PATH). Read `docs/conventions/README.md`
+for how the layers and frontmatter work.

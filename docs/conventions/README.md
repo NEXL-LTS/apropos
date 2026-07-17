@@ -14,7 +14,7 @@ here. Anything a tool can enforce lives in that tool (`crystal tool format`,
 | Layer | For | Trigger | Delivered by |
 | --- | --- | --- | --- |
 | 1 Root file | Universal rules | Always loaded | `AGENTS.md` |
-| 2 Path-scoped | Guidance for a directory / file type | File **path** | PreToolUse hook (once built); Phase 0 interim hook today |
+| 2 Path-scoped | Guidance for a directory / file type | File **path** | PreToolUse hook |
 | 3 Construct-scoped | Guidance for an API / code construct | Written **content** (regex), optionally AND path | PostToolUse hook |
 | 4 Intent skills | Task-nature guidance (semantic) | Claude Code skill match | Generated `.claude/skills/*/SKILL.md` |
 
@@ -48,8 +48,8 @@ Combination semantics:
 - Add an optional `## Verify` heading; `muninn review` harvests it as a review
   checklist item.
 
-> Delivery note: until the `muninn` binary self-hosts (PRD M6), rules here are
-> injected by the interim `.claude/hooks/inject-rules.sh`, which does naive
-> path matching on PostToolUse only (no index, no dedup). It is deliberately
-> minimal — just enough to keep these conventions in front of the agent while
-> muninn is built.
+> Delivery note: this repo self-hosts (PRD M6). Rules here are compiled and
+> injected by `muninn` itself — Layer 2 on PreToolUse, Layer 3 on PostToolUse —
+> via the hook entries in `.claude/settings.json`. Run `make install` so the
+> `muninn hook pre`/`muninn hook post` commands resolve on PATH; `muninn doctor`
+> checks the wiring.

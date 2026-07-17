@@ -61,3 +61,12 @@ jobs:
 
       - name: Release smoke build
         run: crystal build --release src/muninn.cr -o bin/muninn
+
+      # Self-check: the repo dogfoods the standard (PRD §7.2/M6), so the built
+      # binary must find its own generated skill wrappers byte-identical and its
+      # own convention docs lint-clean. This is the drift gate against a
+      # hand-edited SKILL.md or a malformed rule doc landing on main.
+      - name: Self-check (generate --check && lint)
+        run: |
+          ./bin/muninn generate --check
+          ./bin/muninn lint

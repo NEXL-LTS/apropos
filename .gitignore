@@ -16,3 +16,4 @@
 
 # coverage output
 /coverage/
+.cache/muninn/

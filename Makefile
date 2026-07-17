@@ -9,6 +9,10 @@ export CRYSTAL_CACHE_DIR
 CRYTIC_VERSION := ~> 9.0
 MUTATION_TARGETS := matcher frontmatter index session_state review
 
+# Where `make install` drops the binary. Default to the per-user bin dir that is
+# already on PATH in the devcontainer; override with `make install PREFIX=/usr/local`.
+PREFIX ?= $(HOME)/.local
+
 .DEFAULT_GOAL := help
 
 .PHONY: help
@@ -27,6 +31,12 @@ build: ## Build the muninn binary (debug)
 .PHONY: release
 release: ## Build the muninn binary (release)
 	crystal build --release src/muninn.cr -o bin/muninn
+
+.PHONY: install
+install: release ## Build the release binary and install it to PREFIX/bin (on PATH)
+	@mkdir -p "$(PREFIX)/bin"
+	install -m 0755 bin/muninn "$(PREFIX)/bin/muninn"
+	@echo ">> installed muninn to $(PREFIX)/bin/muninn"
 
 .PHONY: spec
 spec: ## Run the spec suite

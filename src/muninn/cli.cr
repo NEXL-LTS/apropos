@@ -14,16 +14,15 @@ require "./filesystem"
 module Muninn
   # Command routing for the `muninn` binary.
   #
-  # At M0 only `--version` and `--help` are wired; every subcommand named in the
-  # usage text lands in a later milestone (PRD §9). All output goes through
-  # injected IO so the router is unit-testable without a subprocess.
+  # All output goes through injected IO so the router is unit-testable without a
+  # subprocess (PRD §8.2).
   class CLI
     USAGE = <<-USAGE
       muninn — deliver the right conventions to the right moment.
 
       Usage: muninn <command> [options]
 
-      Commands (see PRD §5; most land after M0):
+      Commands (see PRD §5):
         init        Bootstrap the convention structure into a repo
         generate    Compile frontmatter into the index + skill wrappers
         hook pre    PreToolUse handler  (Layer 2, path-scoped)
