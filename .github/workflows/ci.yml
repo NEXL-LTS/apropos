@@ -70,3 +70,38 @@ jobs:
         run: |
           ./bin/muninn generate --check
           ./bin/muninn lint
+
+  # Build the devcontainer image so a change to .devcontainer/Dockerfile (e.g.
+  # the crystal/kcov/bats toolchain) can't break the dev environment unnoticed.
+  # The image is loaded and smoke-checked to confirm the tools it installs are
+  # actually on PATH and wired up (BATS_LIB_PATH in particular).
+  devcontainer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build devcontainer image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: .devcontainer/Dockerfile
+          load: true
+          tags: muninn-devcontainer:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke-check the installed toolchain
+        run: |
+          docker run --rm muninn-devcontainer:ci bash -c '
+            set -e
+            crystal --version
+            shards --version
+            kcov --version
+            bats --version
+            jq --version
+            echo "BATS_LIB_PATH=$BATS_LIB_PATH"
+            test -f "$BATS_LIB_PATH/bats-support/load.bash"
+            test -f "$BATS_LIB_PATH/bats-assert/load.bash"
+          '
