@@ -46,14 +46,14 @@ setup() { ensure_muninn; }
   assert_output --partial "$SENTINEL_L4"
 }
 
-@test "Layer 4 with plugin (OpenCode): the new arithmetic op carries the sentinel" {
+@test "Layer 4 with muninn (OpenCode): the new arithmetic op carries the sentinel" {
   require_live_opencode
   new_sample with
   run_opencode "$PROMPT_L4"
   assert grep -q "$SENTINEL_L4" "$WORK/lib/calc.py"
 }
 
-@test "Layer 4 without plugin (OpenCode): the sentinel does not appear" {
+@test "Layer 4 without muninn (OpenCode): the sentinel does not appear" {
   require_live_opencode
   new_sample without
   run_opencode "$PROMPT_L4"

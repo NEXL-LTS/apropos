@@ -166,8 +166,9 @@ module Muninn
     end
 
     # Write (or update) the OpenCode Bun plugin that bridges `muninn hook pre`
-    # and `muninn hook post` into OpenCode's `tool.execute.after` event. Uses
-    # `sync` so a re-run is a no-op when the content is identical.
+    # into OpenCode's `tool.execute.before` event (Layer 2) and `muninn hook
+    # post` into `tool.execute.after` (Layer 3). Uses `sync` so a re-run is a
+    # no-op when the content is identical.
     private def scaffold_opencode(repo_root : Path, fs : Filesystem, options : Options, stdout : IO) : Nil
       path = repo_root.join(".opencode", "plugins", "muninn.js").to_s
       existing = fs.read?(path)

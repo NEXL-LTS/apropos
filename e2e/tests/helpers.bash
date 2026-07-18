@@ -2,7 +2,8 @@
 #
 # Loaded by each *.bats file via `load helpers`. Provides the sample-repo
 # scaffolding, the muninn-on-PATH bootstrap, and the `claude -p` runner. The
-# per-layer sentinels and prompts live here so the test files stay declarative.
+# per-layer sentinels and prompts live in the individual layer*.bats files so
+# each layer's expectations stay self-contained.
 
 _e2e_dir()    { cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd; }
 _repo_root()  { cd "$(_e2e_dir)/.." && pwd; }
