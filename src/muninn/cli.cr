@@ -126,11 +126,12 @@ module Muninn
       property? example = false
       property? claude_symlink = false
       property? dry_run = false
+      property? opencode = false
       property override : String? = nil
     end
 
     # `muninn init [--force] [--example] [--claude-symlink] [--dry-run]
-    # [--repo-root DIR]`. An authoring command: fails *closed*.
+    # [--opencode] [--repo-root DIR]`. An authoring command: fails *closed*.
     private def handle_init(args : Array(String)) : Int32
       opts = InitArgs.new
       if code = parse_init_args(args, opts)
@@ -142,7 +143,8 @@ module Muninn
 
       options = Init::Options.new(
         force: opts.force?, example: opts.example?,
-        claude_symlink: opts.claude_symlink?, dry_run: opts.dry_run?)
+        claude_symlink: opts.claude_symlink?, dry_run: opts.dry_run?,
+        opencode: opts.opencode?)
       Init.run(root, Filesystem::Real.new, options, @stdout, @stderr)
     end
 
@@ -154,6 +156,7 @@ module Muninn
         when "--example"        then opts.example = true
         when "--claude-symlink" then opts.claude_symlink = true
         when "--dry-run"        then opts.dry_run = true
+        when "--opencode"       then opts.opencode = true
         when "--repo-root"
           index += 1
           value = args[index]?

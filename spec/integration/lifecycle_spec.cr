@@ -26,6 +26,24 @@ describe "muninn init/lint/doctor/help (binary)" do
     File.delete?(binary)
   end
 
+  it "bootstraps a repo with --opencode and doctor shows opencode line" do
+    dir = File.tempname("muninn-lifecycle-opencode")
+    begin
+      Dir.mkdir_p(dir)
+
+      code, stdout = run_muninn(binary, ["init", "--opencode", "--repo-root", dir])
+      code.should eq(0)
+      stdout.should contain(".opencode/plugins/muninn.js")
+      File.exists?(File.join(dir, ".opencode/plugins/muninn.js")).should be_true
+      File.exists?(File.join(dir, ".claude/settings.json")).should be_true
+
+      _, stdout = run_muninn(binary, ["doctor", "--repo-root", dir])
+      stdout.should contain("opencode:")
+    ensure
+      FileUtils.rm_rf(dir)
+    end
+  end
+
   it "bootstraps a repo and lints it clean" do
     dir = File.tempname("muninn-lifecycle-repo")
     begin

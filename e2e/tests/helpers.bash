@@ -54,6 +54,7 @@ new_sample() {
   if [ "$mode" = "without" ]; then
     printf '{"hooks":{}}\n' > "$WORK/.claude/settings.json"
     rm -rf "$WORK/.claude/skills"
+    rm -f "$WORK/.opencode/plugins/muninn.js"
   fi
   export WORK
 }
@@ -68,6 +69,7 @@ post_payload() {  # arg: repo-relative file path (content raises NotImplementedE
 
 # --- live claude runner -------------------------------------------------------
 claude_ready() { command -v claude >/dev/null 2>&1; }
+opencode_ready() { command -v opencode >/dev/null 2>&1; }
 
 # Skip the current test unless a real, authenticated claude is available. Uses a
 # run-wide flag so that once claude is found unusable, later live tests skip
@@ -75,6 +77,27 @@ claude_ready() { command -v claude >/dev/null 2>&1; }
 require_live_claude() {
   claude_ready || skip "claude not on PATH"
   [ -f "$BATS_RUN_TMPDIR/claude_unusable" ] && skip "claude unusable (detected earlier)"
+  return 0
+}
+
+# Skip unless a real, authenticated opencode is available. Uses a run-wide
+# unusable flag so that once opencode is found unusable, later live tests
+# skip immediately instead of each paying for a failed call.
+require_live_opencode() {
+  opencode_ready || skip "opencode not on PATH"
+  [ -f "$BATS_RUN_TMPDIR/opencode_unusable" ] && skip "opencode unusable (detected earlier)"
+  # Quick auth probe: opencode run with an empty prompt exits 0 only when the
+  # CLI is properly configured. Any non-zero exit marks it unusable.
+  if [ ! -f "$BATS_RUN_TMPDIR/opencode_auth_ok" ]; then
+    local rc=0
+    timeout 15 opencode run "reply with the single word READY" \
+      >/dev/null 2>/dev/null || rc=$?
+    if [ "$rc" -ne 0 ]; then
+      touch "$BATS_RUN_TMPDIR/opencode_unusable"
+      skip "opencode not authenticated (exit $rc)"
+    fi
+    touch "$BATS_RUN_TMPDIR/opencode_auth_ok"
+  fi
   return 0
 }
 
@@ -116,5 +139,21 @@ run_claude() {  # arg: prompt
   if [ -n "$reason" ]; then
     touch "$BATS_RUN_TMPDIR/claude_unusable"
     skip "$reason"
+  fi
+}
+
+# Run opencode non-interactively in $WORK. The plugin at
+# .opencode/plugins/muninn.js bridges the hook calls; muninn must be on PATH.
+# Stdout is written to $WORK/_oc_out.txt; a nonzero exit skips the test.
+run_opencode() {  # arg: prompt
+  local model_args=()
+  [ -n "${E2E_MODEL:-}" ] && model_args=(--model "$E2E_MODEL")
+  local rc=0
+  (
+    cd "$WORK" && opencode run "$1" "${model_args[@]}"
+  ) >"$WORK/_oc_out.txt" 2>"$WORK/_oc_err.txt" || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    touch "$BATS_RUN_TMPDIR/opencode_unusable"
+    skip "opencode exited $rc"
   fi
 }

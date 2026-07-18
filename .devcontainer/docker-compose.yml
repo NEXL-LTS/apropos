@@ -11,6 +11,7 @@ services:
       - ${HOME}/.claude.json:/home/vscode/.claude.json
       - ${HOME}/.ssh:/home/vscode/.ssh:ro
       - claude-data:/home/vscode/.claude
+      - opencode-data:/home/vscode/.config/opencode
       - crystal-cache:/home/vscode/.cache/crystal
     # kcov (the coverage gate) drives the spec binary under ptrace and calls
     # personality() to disable ASLR. The default container sandbox blocks both,
@@ -23,4 +24,5 @@ services:
 
 volumes:
   claude-data:
+  opencode-data:
   crystal-cache:

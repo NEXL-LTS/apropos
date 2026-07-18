@@ -157,4 +157,7 @@ USER vscode
 RUN curl -fsSL https://claude.ai/install.sh | bash && \
     echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 
+# opencode CLI, installed to the user's home.
+RUN curl -fsSL https://opencode.ai/install | bash
+
 ENV PATH=/home/vscode/.local/bin:$PATH

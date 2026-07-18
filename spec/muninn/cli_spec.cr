@@ -368,6 +368,21 @@ describe Muninn::CLI do
       end
     end
 
+    it "scaffolds the OpenCode plugin with --opencode" do
+      dir = File.tempname("muninn-cli-init-opencode")
+      begin
+        Dir.mkdir_p(dir)
+        code, out, err = run(["init", "--opencode", "--repo-root", dir])
+        code.should eq(0)
+        err.should be_empty
+        out.should contain(".opencode/plugins/muninn.js")
+        File.exists?(File.join(dir, ".opencode/plugins/muninn.js")).should be_true
+        File.exists?(File.join(dir, ".claude/settings.json")).should be_true
+      ensure
+        FileUtils.rm_rf(dir)
+      end
+    end
+
     it "rejects --repo-root without a value" do
       code, _, err = run(["init", "--repo-root"])
       code.should eq(1)
