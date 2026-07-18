@@ -6,6 +6,9 @@
 # OpenCode reads this same path natively (no plugin required), so the same
 # generated wrapper serves both Claude Code and OpenCode.
 
+export SENTINEL_L4="muninn-rule:L4-Q7X2"
+export PROMPT_L4="Add a new arithmetic operation divide(a, b) to the calc library in lib/calc.py."
+
 bats_load_library bats-support
 bats_load_library bats-assert
 load helpers

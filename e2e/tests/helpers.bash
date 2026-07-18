@@ -4,15 +4,6 @@
 # scaffolding, the muninn-on-PATH bootstrap, and the `claude -p` runner. The
 # per-layer sentinels and prompts live here so the test files stay declarative.
 
-# --- per-layer sentinels (each appears in exactly one convention doc) ----------
-export SENTINEL_L2="muninn-rule:L2-7Q2X"
-export SENTINEL_L3="muninn-rule:L3-K9F4"
-export SENTINEL_L4="muninn-rule:L4-Q7X2"
-
-export PROMPT_L2="Add a function shout_twice(text) to src/util.py that returns text uppercased and repeated twice."
-export PROMPT_L3="Add a stub function sync() to scripts/jobs.py that raises NotImplementedError."
-export PROMPT_L4="Add a new arithmetic operation divide(a, b) to the calc library in lib/calc.py."
-
 _e2e_dir()    { cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd; }
 _repo_root()  { cd "$(_e2e_dir)/.." && pwd; }
 
@@ -81,6 +72,21 @@ post_payload() {  # arg: repo-relative file path (content raises NotImplementedE
 claude_ready() { command -v claude >/dev/null 2>&1; }
 opencode_ready() { command -v opencode >/dev/null 2>&1; }
 
+# Echo the exact live command a runner is about to execute, so it can be copied
+# and run by hand to reproduce a failure.
+#
+# Default: write to stdout, which bats captures and surfaces only when the test
+# fails — the standard bats idiom, and exactly when you need the reproduction.
+# Set DEBUG=1 to instead stream it live via fd 3, which bats shows during every
+# test (passing ones included).
+echo_cmd() {  # arg: command string
+  if [ -n "${DEBUG:-}" ] && { true >&3; } 2>/dev/null; then
+    printf '\n    # run this to reproduce:\n    %s\n\n' "$1" >&3
+  else
+    printf '\n    # run this to reproduce:\n    %s\n\n' "$1"
+  fi
+}
+
 # Skip the current test unless a real, authenticated claude is available. Uses a
 # run-wide flag so that once claude is found unusable, later live tests skip
 # immediately instead of each paying for a failed call.
@@ -90,44 +96,22 @@ require_live_claude() {
   return 0
 }
 
-# Strip ANSI escape codes (opencode's TUI-style banner/formatting) so a log
-# excerpt is readable as plain text in a one-line skip reason.
-_strip_ansi() { sed -E $'s/\x1b\\[[0-9;]*[a-zA-Z]//g'; }
-
-# A compact, single-line excerpt of a log file's *last* ~300 characters
-# (after stripping ANSI codes and blank lines) — usually where the actual
-# error message is. Empty string if the file is missing or empty.
-_oc_excerpt() {  # arg: log file path
-  local text
-  text="$(_strip_ansi <"$1" 2>/dev/null | sed '/^[[:space:]]*$/d' | tr '\n' ' ' | sed 's/  */ /g')"
-  if [ "${#text}" -gt 300 ]; then
-    text="...${text: -300}"
-  fi
-  printf '%s' "$text"
-}
-
 # Skip unless a real, authenticated opencode is available. Uses a run-wide
-# unusable flag (holding the *reason*, not just a marker) so that once
-# opencode is found unusable, later live tests skip immediately with the same
-# diagnostic instead of each re-probing and re-discovering it independently.
+# unusable flag so that once opencode is found unusable, later live tests
+# skip immediately instead of each paying for a failed call.
 require_live_opencode() {
   opencode_ready || skip "opencode not on PATH"
-  if [ -f "$BATS_RUN_TMPDIR/opencode_unusable" ]; then
-    skip "opencode unusable (detected earlier): $(cat "$BATS_RUN_TMPDIR/opencode_unusable")"
-  fi
-  # Quick auth probe: `opencode run` exits 0 only when the CLI is properly
-  # configured (a provider is authenticated). Any non-zero exit marks it
-  # unusable for the rest of the run. Output is captured (not discarded) so a
-  # failure's actual cause — not just an exit code — is visible in the skip
-  # reason. Common cause: no provider authenticated — run `opencode auth
-  # login` (see e2e/README.md's CI-safety section).
+  [ -f "$BATS_RUN_TMPDIR/opencode_unusable" ] && skip "opencode unusable (detected earlier)"
+  # Quick auth probe: opencode run with an empty prompt exits 0 only when the
+  # CLI is properly configured. Any non-zero exit marks it unusable.
   if [ ! -f "$BATS_RUN_TMPDIR/opencode_auth_ok" ]; then
-    local log="$BATS_RUN_TMPDIR/opencode_auth_probe.log" rc=0
-    timeout 30 opencode run "reply with the single word READY" >"$log" 2>&1 || rc=$?
+    local rc=0
+    echo_cmd "opencode run \"reply with the single word READY\""
+    timeout 15 opencode run "reply with the single word READY" \
+      >/dev/null 2>/dev/null || rc=$?
     if [ "$rc" -ne 0 ]; then
-      local reason="exit $rc: $(_oc_excerpt "$log")"
-      printf '%s' "$reason" >"$BATS_RUN_TMPDIR/opencode_unusable"
-      skip "opencode auth probe failed ($reason) — full output: $log"
+      touch "$BATS_RUN_TMPDIR/opencode_unusable"
+      skip "opencode not authenticated (exit $rc)"
     fi
     touch "$BATS_RUN_TMPDIR/opencode_auth_ok"
   fi
@@ -151,6 +135,10 @@ run_claude() {  # arg: prompt
   local model_args=()
   [ -n "${E2E_MODEL:-}" ] && model_args=(--model "$E2E_MODEL")
   local rc=0
+  echo_cmd "cd $WORK && \\
+  env -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT -u CLAUDE_CODE_SESSION_ID \\
+      -u CLAUDE_CODE_CHILD_SESSION -u CLAUDE_CODE_SSE_PORT -u CLAUDE_CODE_EXECPATH \\
+  claude -p \"$1\" --output-format json --permission-mode auto ${model_args[*]}"
   (
     cd "$WORK" && env \
       -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT -u CLAUDE_CODE_SESSION_ID \
@@ -177,20 +165,17 @@ run_claude() {  # arg: prompt
 
 # Run opencode non-interactively in $WORK. The plugin at
 # .opencode/plugins/muninn.js bridges the hook calls; muninn must be on PATH.
-# Output is written to $WORK/_oc_out.txt / _oc_err.txt; a nonzero exit skips
-# the test with an excerpt of that output in the skip reason (not just the
-# exit code) so the actual cause is visible without opening the log files.
+# Stdout is written to $WORK/_oc_out.txt; a nonzero exit skips the test.
 run_opencode() {  # arg: prompt
   local model_args=()
   [ -n "${E2E_MODEL:-}" ] && model_args=(--model "$E2E_MODEL")
   local rc=0
+  echo_cmd "cd $WORK && opencode run \"$1\" ${model_args[*]}"
   (
     cd "$WORK" && opencode run "$1" "${model_args[@]}"
   ) >"$WORK/_oc_out.txt" 2>"$WORK/_oc_err.txt" || rc=$?
   if [ "$rc" -ne 0 ]; then
-    local reason="exit $rc: $(_oc_excerpt "$WORK/_oc_err.txt")"
-    [ -z "$(_oc_excerpt "$WORK/_oc_err.txt")" ] && reason="exit $rc: $(_oc_excerpt "$WORK/_oc_out.txt")"
-    printf '%s' "$reason" >"$BATS_RUN_TMPDIR/opencode_unusable"
-    skip "opencode run failed ($reason) — full output: $WORK/_oc_out.txt / $WORK/_oc_err.txt"
+    touch "$BATS_RUN_TMPDIR/opencode_unusable"
+    skip "opencode exited $rc"
   fi
 }

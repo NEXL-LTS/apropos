@@ -168,6 +168,10 @@ describe Muninn::Init do
       plugin.should contain("tool.execute.after")
       plugin.should contain("noReply: true")
       plugin.should contain(%(["muninn", "hook", sub]))
+      # OpenCode delivers tool args in the second callback parameter; the plugin
+      # must read from there (falling back to input) or Layer 2 never fires.
+      plugin.should contain("async (input, output)")
+      plugin.should contain("output?.args ?? input.args")
       stdout.should contain(".opencode/plugins/muninn.js")
     end
 

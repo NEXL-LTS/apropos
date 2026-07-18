@@ -5,6 +5,9 @@
 # Claude Code delivers via PreToolUse; OpenCode delivers via tool.execute.before
 # + client.session.prompt(noReply:true) from the generated plugin.
 
+export SENTINEL_L2="muninn-rule:L2-7Q2X"
+export PROMPT_L2="Add a function shout_twice(text) to src/util.py that returns text uppercased and repeated twice."
+
 bats_load_library bats-support
 bats_load_library bats-assert
 load helpers

@@ -5,6 +5,9 @@
 # Claude Code delivers via PostToolUse; OpenCode delivers via tool.execute.after
 # + client.session.prompt(noReply:true) from the generated plugin.
 
+export SENTINEL_L3="muninn-rule:L3-K9F4"
+export PROMPT_L3="Add a stub function sync() to scripts/jobs.py that raises NotImplementedError."
+
 bats_load_library bats-support
 bats_load_library bats-assert
 load helpers
