@@ -81,12 +81,20 @@ require_live_claude() {
 # Run claude non-interactively in $WORK on the DEFAULT config (so real auth
 # applies) with the sample's own project hooks. Inherited CLAUDE_CODE_* session
 # vars are unset for a clean nested session; --permission-mode auto lets the edit
-# through. Writes result JSON to $WORK/_out.json. If claude could not actually
-# run (not logged in / rate limited), marks the run unusable and skips the test.
+# through. Result JSON is written to $WORK/_out.json and stderr to $WORK/_err.txt.
+#
+# Any run that did not complete cleanly — a nonzero exit (CLI / connectivity
+# error), or a result flagged `is_error` (e.g. not logged in, rate limited) — is
+# treated as "claude could not run" and SKIPs the test (and marks claude unusable
+# so later live tests skip immediately instead of each paying for a failed call).
+# Only a clean run (exit 0, is_error false) returns, so a genuine "muninn did not
+# influence the output" still fails loudly at the assertion.
 run_claude() {  # arg: prompt
   local dbg="$BATS_TEST_TMPDIR/hooks.log"
+  local out="$WORK/_out.json" err="$WORK/_err.txt"
   local model_args=()
   [ -n "${E2E_MODEL:-}" ] && model_args=(--model "$E2E_MODEL")
+  local rc=0
   (
     cd "$WORK" && env \
       -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT -u CLAUDE_CODE_SESSION_ID \
@@ -96,11 +104,17 @@ run_claude() {  # arg: prompt
         --output-format json \
         --permission-mode auto \
         --debug hooks --debug-file "$dbg" \
-        "${model_args[@]}" \
-      >"$WORK/_out.json" 2>/dev/null
-  )
-  if grep -qiE 'not logged in|please run /login|invalid api key|authentication|credit balance|overloaded|rate limit' "$WORK/_out.json" 2>/dev/null; then
+        "${model_args[@]}"
+  ) >"$out" 2>"$err" || rc=$?
+
+  local reason=""
+  if [ "$rc" -ne 0 ]; then
+    reason="claude exited $rc"
+  elif ! jq -e '.is_error == false' "$out" >/dev/null 2>&1; then
+    reason="claude reported an error or produced no JSON result"
+  fi
+  if [ -n "$reason" ]; then
     touch "$BATS_RUN_TMPDIR/claude_unusable"
-    skip "claude could not run (auth / rate limit)"
+    skip "$reason"
   fi
 }

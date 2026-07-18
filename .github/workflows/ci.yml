@@ -100,6 +100,7 @@ jobs:
             shards --version
             kcov --version
             bats --version
+            jq --version
             echo "BATS_LIB_PATH=$BATS_LIB_PATH"
             test -f "$BATS_LIB_PATH/bats-support/load.bash"
             test -f "$BATS_LIB_PATH/bats-assert/load.bash"

@@ -94,5 +94,6 @@ sentinel only ever reaches the model through muninn, never through a memory file
 - `E2E_MODEL=<model>` — pass a specific model to `claude --model` (default: the
   CLI's configured model). Use a small model (e.g. `E2E_MODEL=claude-haiku-4-5`)
   for cheaper runs.
-- `E2E_KEEP=1` — keep the temp working directories for inspection instead of
-  deleting them on exit.
+- To keep the per-test temp dirs (sample repo, `_out.json`, hook debug log) for
+  inspection, pass bats's `--no-tempdir-cleanup`:
+  `bash e2e/run.sh --no-tempdir-cleanup`.
