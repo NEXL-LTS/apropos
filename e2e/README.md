@@ -84,6 +84,20 @@ authenticate, the corresponding tests **skip cleanly** and the script still exit
 `0`; the deterministic checks always run. This is why the e2e is not wired into
 `make check` or the CI gate — it is a local, opt-in confidence check.
 
+In the devcontainer, Claude's credentials come in "for free" via the
+`${HOME}/.claude.json` bind mount from the host. OpenCode has no host bind mount
+— its credential lives at `~/.local/share/opencode/auth.json` (a *named* volume,
+`opencode-data` in `docker-compose.yml`), so the first time you use the
+container you need to authenticate once yourself:
+
+```sh
+opencode auth login
+```
+
+It persists in the named volume after that (survives rebuilds, not just
+restarts). If you skip this, the live OpenCode tests skip with "opencode not
+authenticated" — the deterministic delivery tests still run either way.
+
 ## Hermeticity
 
 The live run is kept clean of ambient state: it runs in a throwaway git repo

@@ -55,6 +55,16 @@ new_sample() {
     printf '{"hooks":{}}\n' > "$WORK/.claude/settings.json"
     rm -rf "$WORK/.claude/skills"
     rm -f "$WORK/.opencode/plugins/muninn.js"
+    # Remove the sentinel-bearing convention docs themselves, not just the
+    # delivery mechanism. Without this, a sufficiently agentic model (observed
+    # with OpenCode's build agent, which readily runs `cat docs/conventions/...`
+    # on its own initiative after reading AGENTS.md's pointer to that
+    # directory) can discover the sentinel by direct exploration — a path that
+    # has nothing to do with muninn and would falsely fail the without-muninn
+    # control.
+    rm -f "$WORK/docs/conventions/src-rule.md" \
+          "$WORK/docs/conventions/stub-rule.md" \
+          "$WORK/docs/conventions/workflows/add-operation.md"
   fi
   export WORK
 }
