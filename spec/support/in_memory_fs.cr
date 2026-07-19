@@ -1,10 +1,10 @@
-require "../../src/muninn/filesystem"
+require "../../src/apropos/filesystem"
 
 # A full in-memory `Filesystem` for unit specs: `glob` honours the same
 # `File.match?` semantics as the real adapter, and writes/reads/removes mutate
 # an internal map so generate's disk effects are observable without touching
 # disk. `removed` records prune targets for assertions.
-class InMemoryFS < Muninn::Filesystem
+class InMemoryFS < Apropos::Filesystem
   getter files : Hash(String, String)
   getter removed : Array(String)
   getter symlinks : Hash(String, String)

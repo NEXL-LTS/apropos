@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "muninn hook pre",
+            "command": "apropos hook pre",
             "timeout": 10
           }
         ]
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "muninn hook post",
+            "command": "apropos hook post",
             "timeout": 10
           }
         ]

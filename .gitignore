@@ -6,7 +6,7 @@
 /.shards/
 *.dwarf
 
-# Local caches: Crystal compile cache, muninn trigger index + session state.
+# Local caches: Crystal compile cache, apropos trigger index + session state.
 # The Makefile points CRYSTAL_CACHE_DIR here so `make` works even where the
 # global ~/.cache/crystal is not writable.
 /.cache/
@@ -16,4 +16,4 @@
 
 # coverage output
 /coverage/
-.cache/muninn/
+.cache/apropos/

@@ -10,17 +10,17 @@ private def run_hook(binary : String, args : Array(String), payload : String) : 
   {status.exit_code, stdout.to_s}
 end
 
-describe "muninn hook (binary)" do
-  binary = File.join(Dir.tempdir, "muninn-hook-#{Process.pid}")
+describe "apropos hook (binary)" do
+  binary = File.join(Dir.tempdir, "apropos-hook-#{Process.pid}")
 
   Spec.before_suite do
     status = Process.run(
       "crystal",
-      ["build", "src/muninn.cr", "-o", binary],
+      ["build", "src/apropos.cr", "-o", binary],
       output: Process::Redirect::Inherit,
       error: Process::Redirect::Inherit
     )
-    raise "failed to build muninn binary for integration specs" unless status.success?
+    raise "failed to build apropos binary for integration specs" unless status.success?
   end
 
   Spec.after_suite do
@@ -28,7 +28,7 @@ describe "muninn hook (binary)" do
   end
 
   it "injects a Layer 2 rule on PreToolUse and dedupes within a session" do
-    dir = File.tempname("muninn-hook-repo")
+    dir = File.tempname("apropos-hook-repo")
     begin
       Dir.mkdir_p(File.join(dir, "docs/conventions"))
       File.write(File.join(dir, "docs/conventions/jobs.md"),
@@ -51,7 +51,7 @@ describe "muninn hook (binary)" do
   end
 
   it "injects a Layer 3 rule on PostToolUse from written content" do
-    dir = File.tempname("muninn-hook-repo")
+    dir = File.tempname("apropos-hook-repo")
     begin
       Dir.mkdir_p(File.join(dir, "docs/conventions"))
       File.write(File.join(dir, "docs/conventions/db.md"),

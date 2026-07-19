@@ -1,6 +1,6 @@
 # Conventions
 
-Scoped guidance for this sample repo, delivered just-in-time by muninn.
+Scoped guidance for this sample repo, delivered just-in-time by apropos.
 
 | Layer | For | Trigger | Delivered by |
 | --- | --- | --- | --- |

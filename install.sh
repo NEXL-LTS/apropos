@@ -1,21 +1,21 @@
 #!/usr/bin/env sh
-# muninn installer — resolves a GitHub release, verifies its checksum, and drops
+# apropos installer — resolves a GitHub release, verifies its checksum, and drops
 # the static binary on your PATH. Curl-pipe friendly:
 #
 #   curl -fsSL https://raw.githubusercontent.com/NEXL-LTS/muninn-rules/main/install.sh | sh
 #
 # Overrides (environment variables):
-#   MUNINN_VERSION   release tag to install (default: latest)
-#   MUNINN_BIN_DIR   install directory      (default: $HOME/.local/bin)
-#   MUNINN_REPO      owner/repo             (default: NEXL-LTS/muninn-rules)
+#   APROPOS_VERSION   release tag to install (default: latest)
+#   APROPOS_BIN_DIR   install directory      (default: $HOME/.local/bin)
+#   APROPOS_REPO      owner/repo             (default: NEXL-LTS/muninn-rules)
 #
-# Unlike muninn's hook path, an installer must FAIL CLOSED: any error aborts with
+# Unlike apropos's hook path, an installer must FAIL CLOSED: any error aborts with
 # a non-zero exit and a clear message rather than leaving a half-installed tool.
 set -eu
 
-REPO="${MUNINN_REPO:-NEXL-LTS/muninn-rules}"
-VERSION="${MUNINN_VERSION:-latest}"
-BIN_DIR="${MUNINN_BIN_DIR:-$HOME/.local/bin}"
+REPO="${APROPOS_REPO:-NEXL-LTS/muninn-rules}"
+VERSION="${APROPOS_VERSION:-latest}"
+BIN_DIR="${APROPOS_BIN_DIR:-$HOME/.local/bin}"
 
 die() {
   echo "install.sh: $*" >&2
@@ -33,7 +33,7 @@ case "$arch" in
   *) die "unsupported architecture '$arch'; v1 ships x86_64 only (build from source: make install)." ;;
 esac
 
-asset="muninn-linux-x86_64"
+asset="apropos-linux-x86_64"
 
 # --- Downloader --------------------------------------------------------------
 if command -v curl >/dev/null 2>&1; then
@@ -74,11 +74,11 @@ echo ">> verifying checksum ..."
 
 # --- Install -----------------------------------------------------------------
 mkdir -p "$BIN_DIR"
-install -m 0755 "$tmp/$asset" "$BIN_DIR/muninn" 2>/dev/null \
-  || { chmod 0755 "$tmp/$asset" && mv "$tmp/$asset" "$BIN_DIR/muninn"; } \
-  || die "failed to install to $BIN_DIR (set MUNINN_BIN_DIR to a writable dir, or re-run with sudo)."
+install -m 0755 "$tmp/$asset" "$BIN_DIR/apropos" 2>/dev/null \
+  || { chmod 0755 "$tmp/$asset" && mv "$tmp/$asset" "$BIN_DIR/apropos"; } \
+  || die "failed to install to $BIN_DIR (set APROPOS_BIN_DIR to a writable dir, or re-run with sudo)."
 
-echo ">> installed muninn to $BIN_DIR/muninn"
+echo ">> installed apropos to $BIN_DIR/apropos"
 
 case ":$PATH:" in
   *":$BIN_DIR:"*) ;;
@@ -88,6 +88,6 @@ esac
 
 # Fail closed: a binary that can't execute (wrong arch, noexec mount, corruption)
 # is a broken install, not a success — surface it rather than exiting 0.
-"$BIN_DIR/muninn" --version \
-  || die "installed binary at $BIN_DIR/muninn failed to run — the install is broken (wrong architecture, a noexec mount, or a corrupt download)."
-echo ">> done. Run 'muninn help' for the mental model, or 'muninn init' to bootstrap a repo."
+"$BIN_DIR/apropos" --version \
+  || die "installed binary at $BIN_DIR/apropos failed to run — the install is broken (wrong architecture, a noexec mount, or a corrupt download)."
+echo ">> done. Run 'apropos help' for the mental model, or 'apropos init' to bootstrap a repo."

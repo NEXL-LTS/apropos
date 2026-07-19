@@ -1,6 +1,6 @@
-# muninn
+# apropos
 
-Muninn is a single deterministic binary that delivers the right documentation to
+apropos is a single deterministic binary that delivers the right documentation to
 the right moment. It implements a layered documentation structure (defined in
 `docs/conventions/README.md`): it compiles convention-doc frontmatter into a
 trigger index, generates skill wrappers, serves as a Claude Code hook handler
@@ -14,12 +14,12 @@ Use `make` — it points `CRYSTAL_CACHE_DIR` at a project-local dir so targets w
 even where the global Crystal cache is not writable.
 
 - `make deps` — install shard dependencies
-- `make build` — build the `muninn` binary (debug); `make release` for the static-oriented release build
+- `make build` — build the `apropos` binary (debug); `make release` for the static-oriented release build
 - `make spec` — run the spec suite
 - `make lint` — run ameba (zero findings required)
 - `make check` — lint + spec (the fast local gate)
 - `make coverage` — run specs under kcov and enforce the 100% line-coverage gate
-- `make mutate SUBJECT=src/muninn/<module>.cr` — advisory mutation testing (see `docs/mutation-testing.md`)
+- `make mutate SUBJECT=src/apropos/<module>.cr` — advisory mutation testing (see `docs/mutation-testing.md`)
 
 ## Universal rules
 
@@ -33,7 +33,7 @@ even where the global Crystal cache is not writable.
 ## Where scoped guidance lives
 
 Task- and file-scoped conventions are **not** in this file. They live in
-`docs/conventions/` and are surfaced automatically at edit time by muninn's own
-hooks (`muninn hook pre`/`muninn hook post`, wired in `.claude/settings.json`;
+`docs/conventions/` and are surfaced automatically at edit time by apropos's own
+hooks (`apropos hook pre`/`apropos hook post`, wired in `.claude/settings.json`;
 run `make install` so they resolve on PATH). Read `docs/conventions/README.md`
 for how the layers and frontmatter work.

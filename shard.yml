@@ -1,19 +1,20 @@
-name: muninn-rules
+name: apropos
 version: 0.1.0
 description: |
-  Muninn delivers the right documentation to the right moment. It is a single
-  deterministic binary that implements the Agent Documentation Structure
-  Standard: it compiles convention-doc frontmatter into a trigger index,
-  generates skill wrappers, serves as a Claude Code hook handler that injects
-  path- and construct-scoped rules at edit time, and resolves the conventions
+  Apropos: apt, pertinent, timely — said or done at exactly the right moment.
+  This binary delivers the right convention exactly when it's apropos. It
+  implements the Agent Documentation Structure Standard: compiling
+  convention-doc frontmatter into a trigger index, generating skill wrappers,
+  serving as a Claude Code hook handler that injects path- and
+  construct-scoped rules at edit time, and resolving the conventions
   applicable to a diff for review.
 
 authors:
   - Grant PS <grant@nexl.io>
 
 targets:
-  muninn:
-    main: src/muninn.cr
+  apropos:
+    main: src/apropos.cr
 
 crystal: ">= 1.20"
 

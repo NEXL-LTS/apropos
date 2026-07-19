@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: muninn-linux-x86_64, runner: ubuntu-latest }
+          - { name: apropos-linux-x86_64, runner: ubuntu-latest }
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -27,7 +27,7 @@ jobs:
           docker run --rm -v "$PWD":/w -w /w crystallang/crystal:1.20-alpine sh -c '
             set -e
             shards install --production
-            crystal build --release --static src/muninn.cr -o ${{ matrix.name }}
+            crystal build --release --static src/apropos.cr -o ${{ matrix.name }}
           '
 
       - name: Verify static linkage

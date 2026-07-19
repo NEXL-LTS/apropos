@@ -3,7 +3,7 @@
 This directory is the **single source of truth** for scoped guidance — the
 judgment calls and directional practices that a linter or formatter cannot
 enforce. It is also the normative definition of the layered documentation
-structure muninn implements; muninn dogfoods that structure on itself here.
+structure apropos implements; apropos dogfoods that structure on itself here.
 
 Universal, always-apply rules live in the root [`AGENTS.md`](../../AGENTS.md), not
 here. Anything a tool can enforce lives in that tool (`crystal tool format`,
@@ -58,7 +58,7 @@ rule file is preferred over prose alone.
 **Layer 4 — intent skills.** For guidance triggered by the nature of a task, not
 its path or content ("doing a data migration", "touching billing"). The doc lives
 in `docs/conventions/workflows/` and opts in via `skill: true` + a `description:`
-starting with "Use when…". Skills are **generated, not hand-written**: `muninn
+starting with "Use when…". Skills are **generated, not hand-written**: `apropos
 generate` emits a thin `.claude/skills/<slug>/SKILL.md` wrapper (description +
 pointer to the source doc). Never edit a wrapper — edit the source doc. Keep skill
 docs under 500 lines; split large workflows. Semantic triggering has a miss rate,
@@ -91,7 +91,7 @@ Combination semantics:
   tight get read; long ones get skimmed.
 - State **what** the rule is, **why** it exists (the reason is how an agent
   generalizes to edge cases), and a **verification criterion**.
-- Add an optional `## Verify` heading; `muninn review` harvests it as a review
+- Add an optional `## Verify` heading; `apropos review` harvests it as a review
   checklist item.
 
 ## Classifying an instruction
@@ -110,13 +110,13 @@ For each instruction, ask in order — the most deterministic trigger wins
 
 ## The generation pipeline and review
 
-`muninn generate` walks `docs/conventions/` and compiles the frontmatter into a
-cached **trigger index** (`.cache/muninn/index.json`, gitignored, rebuilt only
-when a doc's hash changes) and the committed **skill wrappers**. `muninn generate
+`apropos generate` walks `docs/conventions/` and compiles the frontmatter into a
+cached **trigger index** (`.cache/apropos/index.json`, gitignored, rebuilt only
+when a doc's hash changes) and the committed **skill wrappers**. `apropos generate
 --check` is the CI gate: it fails if the committed wrappers drift from what the
 current docs produce, so a stale or hand-edited `SKILL.md` blocks the merge.
 
-The same frontmatter doubles as a **review manifest**: `muninn review` resolves
+The same frontmatter doubles as a **review manifest**: `apropos review` resolves
 which conventions apply to a diff exactly as the edit-time hooks do — path-match
 Layer 2, content-match Layer 3 against added lines — and turns each rule's
 `## Verify` criterion into a review checklist item. Review prompts therefore carry
@@ -131,9 +131,9 @@ zero copies of the conventions; one source serves authoring, editing, and review
 - Every skill description passes the "Use when…" precision test; all `SKILL.md`
   files are generator output, never hand-edited, with no guidance duplicated from
   `docs/conventions/`.
-- `muninn generate --check` and `muninn lint` pass; nothing is silently dropped.
+- `apropos generate --check` and `apropos lint` pass; nothing is silently dropped.
 
 > Delivery note: this repo self-hosts. Rules here are compiled and injected by
-> `muninn` itself — Layer 2 on PreToolUse, Layer 3 on PostToolUse — via the hook
-> entries in `.claude/settings.json`. Run `make install` so the `muninn hook pre`/
-> `muninn hook post` commands resolve on PATH; `muninn doctor` checks the wiring.
+> `apropos` itself — Layer 2 on PreToolUse, Layer 3 on PostToolUse — via the hook
+> entries in `.claude/settings.json`. Run `make install` so the `apropos hook pre`/
+> `apropos hook post` commands resolve on PATH; `apropos doctor` checks the wiring.

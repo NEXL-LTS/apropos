@@ -7,7 +7,7 @@ contents: ['\bNotImplementedError\b']
 marker comment on the line immediately above its `def`:
 
 ```python
-# muninn-rule:L3-K9F4
+# apropos-rule:L3-K9F4
 ```
 
 **Why:** Unfinished stubs are tracked by an audit tool that greps for the
@@ -16,5 +16,5 @@ matching `NotImplementedError`, anywhere in the tree, not from the file's path.
 
 ## Verify
 
-- Every function raising `NotImplementedError` has `# muninn-rule:L3-K9F4`
+- Every function raising `NotImplementedError` has `# apropos-rule:L3-K9F4`
   directly above its `def`.

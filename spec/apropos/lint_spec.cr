@@ -1,0 +1,158 @@
+require "../spec_helper"
+
+private ROOT = Path["/repo"]
+
+private def run_lint(fs : Apropos::Filesystem, strict : Bool = false) : {Int32, String}
+  stdout = IO::Memory.new
+  stderr = IO::Memory.new
+  code = Apropos::Lint.run(ROOT, fs, strict, stdout, stderr)
+  {code, stdout.to_s}
+end
+
+private def doc(name : String) : String
+  "/repo/docs/conventions/#{name}"
+end
+
+# The correct on-disk wrapper for a skill doc, so drift tests can install a
+# byte-accurate baseline via the real generator.
+private def wrapper_for(name : String, text : String) : {String, String}
+  convention = Apropos::Convention.parse("docs/conventions/#{name}", text)
+  slug, content = Apropos::Skills.wrappers([convention]).first
+  {"/repo/.claude/skills/#{slug}/SKILL.md", content}
+end
+
+describe Apropos::Lint do
+  it "reports a clean structure and exits 0" do
+    fs = InMemoryFS.new({doc("ok.md") => "---\npaths: [\"src/**\"]\n---\n# Rule\n\nBody.\n"})
+    code, stdout = run_lint(fs)
+    code.should eq(0)
+    stdout.should contain("lint: clean")
+  end
+
+  it "turns a malformed frontmatter doc into an error finding, not a crash" do
+    fs = InMemoryFS.new({doc("bad.md") => "---\npaths: [\n---\nbody\n"})
+    code, stdout = run_lint(fs)
+    code.should eq(1)
+    stdout.should contain("error  docs/conventions/bad.md:")
+  end
+
+  it "warns on unknown frontmatter keys" do
+    fs = InMemoryFS.new({doc("x.md") => "---\npaths: [\"src/**\"]\nfoo: 1\n---\n# R\n\nb\n"})
+    code, stdout = run_lint(fs)
+    code.should eq(0)
+    stdout.should contain("warn   docs/conventions/x.md: unknown frontmatter keys: foo")
+  end
+
+  it "errors when skill: true has no description" do
+    fs = InMemoryFS.new({doc("s.md") => "---\nskill: true\n---\n# S\n\nbody\n"})
+    code, stdout = run_lint(fs)
+    code.should eq(1)
+    stdout.should contain("`skill: true` requires a `description`")
+  end
+
+  it "errors when a description does not start with \"Use when\"" do
+    fs = InMemoryFS.new({doc("s.md") => "---\nskill: true\ndescription: \"Do the thing\"\n---\n# S\n\nb\n"})
+    code, stdout = run_lint(fs)
+    code.should eq(1)
+    stdout.should contain(%(`description` must start with "Use when"))
+  end
+
+  it "errors on an invalid path glob" do
+    fs = InMemoryFS.new({doc("g.md") => "---\npaths: [\"src/[\"]\n---\n# G\n\nb\n"})
+    code, stdout = run_lint(fs)
+    code.should eq(1)
+    stdout.should contain("invalid path glob")
+  end
+
+  it "errors on an uncompilable content regex" do
+    fs = InMemoryFS.new({doc("r.md") => "---\ncontents: ['(']\n---\n# R\n\nb\n"})
+    code, stdout = run_lint(fs)
+    code.should eq(1)
+    stdout.should contain("invalid regex")
+  end
+
+  it "errors when a triggered doc has an empty body" do
+    fs = InMemoryFS.new({doc("e.md") => "---\npaths: [\"src/**\"]\n---\n"})
+    code, stdout = run_lint(fs)
+    code.should eq(1)
+    stdout.should contain("declares triggers but has an empty body")
+  end
+
+  it "warns on a skill doc over the line budget" do
+    body = String.build { |io| (Apropos::Lint::SKILL_DOC_MAX + 1).times { io << "line\n" } }
+    text = "---\nskill: true\ndescription: \"Use when big\"\n---\n#{body}"
+    location, content = wrapper_for("big.md", text)
+    fs = InMemoryFS.new({doc("big.md") => text, location => content})
+    code, stdout = run_lint(fs)
+    code.should eq(0)
+    stdout.should contain("skill doc is over")
+  end
+
+  it "warns when a root file exceeds its line budget but not when it is short" do
+    big = String.build { |io| (Apropos::Lint::ROOT_FILE_MAX + 1).times { io << "x\n" } }
+    fs = InMemoryFS.new({
+      "/repo/AGENTS.md" => big,
+      "/repo/CLAUDE.md" => "short\n",
+    })
+    code, stdout = run_lint(fs)
+    code.should eq(0)
+    stdout.should contain("warn   AGENTS.md: root file is")
+    stdout.should_not contain("CLAUDE.md: root file")
+  end
+
+  describe "generated wrappers" do
+    it "errors on a missing wrapper" do
+      fs = InMemoryFS.new({doc("workflows/w.md") => "---\nskill: true\ndescription: \"Use when w\"\n---\n# W\n\nb\n"})
+      code, stdout = run_lint(fs)
+      code.should eq(1)
+      stdout.should contain("missing generated wrapper")
+    end
+
+    it "errors on a stale wrapper" do
+      text = "---\nskill: true\ndescription: \"Use when w\"\n---\n# W\n\nb\n"
+      location, _ = wrapper_for("workflows/w.md", text)
+      fs = InMemoryFS.new({doc("workflows/w.md") => text, location => "hand edited\n"})
+      code, stdout = run_lint(fs)
+      code.should eq(1)
+      stdout.should contain("stale generated wrapper")
+    end
+
+    it "accepts an up-to-date wrapper" do
+      text = "---\nskill: true\ndescription: \"Use when w\"\n---\n# W\n\nb\n"
+      location, content = wrapper_for("workflows/w.md", text)
+      fs = InMemoryFS.new({doc("workflows/w.md") => text, location => content})
+      code, stdout = run_lint(fs)
+      code.should eq(0)
+      stdout.should contain("lint: clean")
+    end
+
+    it "errors on an orphaned wrapper with no source doc" do
+      fs = InMemoryFS.new({"/repo/.claude/skills/ghost/SKILL.md" => "orphan\n"})
+      code, stdout = run_lint(fs)
+      code.should eq(1)
+      stdout.should contain(".claude/skills/ghost/SKILL.md: orphaned generated wrapper")
+    end
+
+    it "reports a slug collision as a single error and skips drift" do
+      body = "skill: true\ndescription: \"Use when dup\"\n---\n# D\n\nb\n"
+      fs = InMemoryFS.new({
+        doc("a/dup.md") => "---\n#{body}",
+        doc("b/dup.md") => "---\n#{body}",
+      })
+      code, stdout = run_lint(fs)
+      code.should eq(1)
+      stdout.should contain("slug collision")
+    end
+  end
+
+  describe "--strict" do
+    it "promotes warnings to a failing exit code" do
+      fs = InMemoryFS.new({doc("x.md") => "---\npaths: [\"src/**\"]\nfoo: 1\n---\n# R\n\nb\n"})
+      lenient, _ = run_lint(fs, strict: false)
+      lenient.should eq(0)
+      strict, stdout = run_lint(fs, strict: true)
+      strict.should eq(1)
+      stdout.should contain("lint: 0 error(s), 1 warning(s)")
+    end
+  end
+end

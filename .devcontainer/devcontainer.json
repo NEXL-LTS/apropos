@@ -1,5 +1,5 @@
 {
-  "name": "muninn-rules",
+  "name": "apropos",
   "dockerComposeFile": "docker-compose.yml",
   "service": "app",
   "workspaceFolder": "/workspace",
@@ -15,5 +15,5 @@
       }
     }
   },
-  "postCreateCommand": "make deps && make install && crystal --version && claude --version && muninn --version"
+  "postCreateCommand": "make deps && make install && crystal --version && claude --version && apropos --version"
 }

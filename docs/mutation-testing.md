@@ -1,6 +1,6 @@
 # Mutation testing
 
-Mutation testing hardens muninn's pure logic modules — the places where a
+Mutation testing hardens apropos's pure logic modules — the places where a
 surviving mutant means a real correctness gap: `matcher`, `frontmatter`,
 `index`, `session_state`, and `review` diff parsing.
 
@@ -13,7 +13,7 @@ it, drop it with no effect on build, release, or correctness.
 Crytic v9.0.0 (`hanneskaeufler/crytic`) **builds and runs against Crystal
 1.20.3.** Its `shard.yml` nominally targets Crystal 1.12.1 (constraint
 `>= 1.0, < 2.0`), but it compiled cleanly via its `make bin` postinstall and ran
-a full mutation session on `src/muninn/cli.cr`: **10 mutations, 10 killed, MSI
+a full mutation session on `src/apropos/cli.cr`: **10 mutations, 10 killed, MSI
 100%.** So `make mutate` is wired to run crytic for real.
 
 Maintenance note: crytic is single-maintainer and effectively dormant (last
@@ -27,7 +27,7 @@ Crytic is installed on demand into the gitignored `.crytic/` directory, kept out
 of the main dependency graph so CI never builds it.
 
 ```sh
-make mutate SUBJECT=src/muninn/matcher.cr   # mutate one module
+make mutate SUBJECT=src/apropos/matcher.cr   # mutate one module
 make mutate                                  # list recommended targets
 ```
 

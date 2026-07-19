@@ -4,7 +4,7 @@
 # Plain kcov has no built-in threshold flag, so this script reads the
 # percentage back from kcov's coverage.json and fails below the threshold.
 #
-# The thin binary entry point (src/muninn.cr) is excluded from the line count:
+# The thin binary entry point (src/apropos.cr) is excluded from the line count:
 # it is a single delegating line, driven end-to-end by the integration specs as
 # a subprocess (which kcov cannot instrument), so counting it would be
 # misleading. This is the one documented, reviewed exclusion.
@@ -33,7 +33,7 @@ crystal build "$ENTRY" -o "$SPEC_BIN" --debug
 
 kcov \
   --include-path="$(pwd)/src" \
-  --exclude-pattern="src/muninn.cr" \
+  --exclude-pattern="src/apropos.cr" \
   "$OUT_DIR" "$SPEC_BIN"
 
 # kcov writes a per-binary coverage.json; find it and read percent_covered.

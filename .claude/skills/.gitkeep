@@ -1,5 +1,5 @@
 # Generated skill wrappers live here.
 #
-# `muninn generate` writes `<slug>/SKILL.md` for every `skill: true` doc in
+# `apropos generate` writes `<slug>/SKILL.md` for every `skill: true` doc in
 # docs/conventions/. Do not edit these by hand — edit the source doc instead;
-# `muninn generate --check` fails if a wrapper drifts from its source.
+# `apropos generate --check` fails if a wrapper drifts from its source.

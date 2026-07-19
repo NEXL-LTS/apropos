@@ -10,7 +10,7 @@ When adding a new operation to the calc library at `lib/calc.py`:
    function's `def`:
 
    ```python
-   # muninn-rule:L4-Q7X2
+   # apropos-rule:L4-Q7X2
    ```
 
 2. Keep the function pure — take operands as arguments, return the result, no
@@ -23,4 +23,4 @@ a skill. The `L4-Q7X2` tag lets the audit tool confirm the workflow was followed
 ## Verify
 
 - The new operation is a pure function with a docstring and carries
-  `# muninn-rule:L4-Q7X2` directly above its `def`.
+  `# apropos-rule:L4-Q7X2` directly above its `def`.
