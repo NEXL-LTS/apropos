@@ -131,8 +131,8 @@ module Apropos
     end
 
     # `apropos init [--force] [--example] [--claude-symlink] [--dry-run]
-    # [--tool claude|opencode] [--repo-root DIR]`. An authoring command: fails
-    # *closed*. `--tool` is repeatable; omit it entirely to auto-detect.
+    # [--tool claude|opencode|gemini] [--repo-root DIR]`. An authoring command:
+    # fails *closed*. `--tool` is repeatable; omit it entirely to auto-detect.
     private def handle_init(args : Array(String)) : Int32
       opts = InitArgs.new
       if code = parse_init_args(args, opts)
@@ -238,8 +238,9 @@ module Apropos
       Doctor.run(root, Filesystem::Real.new, Environment::Real.new, @stdout, @stderr)
     end
 
-    # `apropos hook pre|post [--repo-root DIR]`. Claude Code
-    # invokes these with the payload on stdin. The whole family fails *open*: an
+    # `apropos hook pre|post [--repo-root DIR]`. The wired CLI agent (Claude
+    # Code and Gemini CLI natively; OpenCode via its generated plugin) invokes
+    # these with the payload on stdin. The whole family fails *open*: an
     # unknown subcommand or a bad `--repo-root` yields exit 0 with no output
     # rather than ever blocking an edit. All work lives in `Hook`.
     private def handle_hook(args : Array(String)) : Int32

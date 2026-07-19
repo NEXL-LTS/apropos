@@ -1,0 +1,15 @@
+{
+  "session_id": "abc123",
+  "transcript_path": "/home/u/.gemini/tmp/x/logs.json",
+  "cwd": "/repo",
+  "hook_event_name": "AfterTool",
+  "timestamp": "2026-07-19T00:00:00Z",
+  "tool_name": "write_file",
+  "tool_input": {
+    "file_path": "db/migrate/001_create.cr",
+    "content": "class Create\n  def up\n    transaction do\n    end\n  end\nend\n"
+  },
+  "tool_response": {
+    "llmContent": "Successfully wrote to db/migrate/001_create.cr"
+  }
+}

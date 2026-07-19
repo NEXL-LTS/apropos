@@ -17,6 +17,7 @@ module Apropos
     INDEX_RELATIVE           = Path[".cache", "apropos", "index.json"]
     SETTINGS_RELATIVE        = Path[".claude", "settings.json"]
     OPENCODE_PLUGIN_RELATIVE = Path[".opencode", "plugins", "apropos.js"]
+    GEMINI_SETTINGS_RELATIVE = Path[".gemini", "settings.json"]
     PROBE_RELATIVE           = Path[".cache", "apropos", ".doctor-probe"]
 
     APROPOS_HOOK_PREFIX = "apropos hook"
@@ -34,6 +35,7 @@ module Apropos
         apropos_check(env),
         claude_check(env),
         opencode_check(repo_root, fs, env),
+        gemini_check(repo_root, fs, env),
         index_check(repo_root, fs),
         cache_check(repo_root, fs),
       ]
@@ -134,6 +136,43 @@ module Apropos
       else
         Check.new(:warn, "opencode", "plugin absent; run `apropos init --tool opencode`")
       end
+    end
+
+    # Check for the Gemini CLI binary and that its AfterTool hook (the only
+    # event whose output schema supports injecting context) calls both
+    # `apropos hook pre` and `apropos hook post`. Advisory only: never fails,
+    # so a Gemini-less repo is not penalised.
+    private def gemini_check(repo_root : Path, fs : Filesystem, env : Environment) : Check
+      unless env.which("gemini")
+        return Check.new(:ok, "gemini", "not on PATH; skipped hook check")
+      end
+      content = fs.read?(repo_root.join(GEMINI_SETTINGS_RELATIVE).to_s)
+      return Check.new(:warn, "gemini", ".gemini/settings.json absent; run `apropos init --tool gemini`") unless content
+
+      wired = gemini_wired?(content)
+      return Check.new(:warn, "gemini", ".gemini/settings.json is not valid JSON") if wired.nil?
+
+      if wired
+        Check.new(:ok, "gemini", "AfterTool hook wired")
+      else
+        Check.new(:warn, "gemini", "AfterTool hook absent; run `apropos init --tool gemini`")
+      end
+    end
+
+    # Whether an `AfterTool` group calls both `apropos hook pre` and `apropos
+    # hook post`. Returns nil when the settings file is not parseable JSON.
+    private def gemini_wired?(content : String) : Bool?
+      parsed =
+        begin
+          JSON.parse(content)
+        rescue JSON::ParseException
+          return nil
+        end
+      groups = parsed.as_h?.try(&.["hooks"]?).try(&.as_h?).try(&.["AfterTool"]?).try(&.as_a?)
+      return false unless groups
+      commands = groups.compact_map(&.as_h?).flat_map { |group| group["hooks"]?.try(&.as_a?) || [] of JSON::Any }
+        .compact_map { |hook| hook.as_h?.try(&.["command"]?).try(&.as_s?) }
+      commands.includes?("apropos hook pre") && commands.includes?("apropos hook post")
     end
 
     private def index_check(repo_root : Path, fs : Filesystem) : Check

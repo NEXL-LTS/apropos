@@ -12,8 +12,7 @@ module Apropos
   module Generate
     extend self
 
-    INDEX_RELATIVE  = Path[".cache", "apropos", "index.json"]
-    SKILLS_RELATIVE = Path[".claude", "skills"]
+    INDEX_RELATIVE = Path[".cache", "apropos", "index.json"]
 
     # Rebuild the index when stale and (re)write every skill wrapper, pruning
     # orphans. Progress goes to `stdout`; errors to `stderr`. Returns a process
@@ -39,17 +38,19 @@ module Apropos
       wrappers = Skills.wrappers(conventions)
       drift = [] of String
 
-      wrappers.each do |slug, content|
-        actual = fs.read?(wrapper_path(repo_root, slug).to_s)
-        if actual.nil?
-          drift << "missing: #{wrapper_display(slug)}"
-        elsif actual != content
-          drift << "stale:   #{wrapper_display(slug)}"
+      Skills::ROOTS.each do |root|
+        wrappers.each do |slug, content|
+          actual = fs.read?(wrapper_path(repo_root, root, slug).to_s)
+          if actual.nil?
+            drift << "missing: #{wrapper_display(root, slug)}"
+          elsif actual != content
+            drift << "stale:   #{wrapper_display(root, slug)}"
+          end
         end
-      end
 
-      (existing_slugs(repo_root, fs) - wrappers.keys).each do |slug|
-        drift << "orphan:  #{wrapper_display(slug)}"
+        (existing_slugs(repo_root, fs, root) - wrappers.keys).each do |slug|
+          drift << "orphan:  #{wrapper_display(root, slug)}"
+        end
       end
 
       report_check(drift, wrappers.size, stdout)
@@ -77,26 +78,30 @@ module Apropos
     end
 
     private def write_wrappers(repo_root, fs, wrappers, stdout) : Nil
-      wrappers.keys.sort!.each do |slug|
-        content = wrappers[slug]
-        path = wrapper_path(repo_root, slug).to_s
-        next if fs.read?(path) == content
-        fs.write(path, content)
-        stdout.puts "skill: wrote #{wrapper_display(slug)}"
+      Skills::ROOTS.each do |root|
+        wrappers.keys.sort!.each do |slug|
+          content = wrappers[slug]
+          path = wrapper_path(repo_root, root, slug).to_s
+          next if fs.read?(path) == content
+          fs.write(path, content)
+          stdout.puts "skill: wrote #{wrapper_display(root, slug)}"
+        end
       end
     end
 
     private def prune_orphans(repo_root, fs, keep : Array(String), stdout) : Nil
-      (existing_slugs(repo_root, fs) - keep).sort.each do |slug|
-        fs.remove(skill_dir(repo_root, slug).to_s)
-        stdout.puts "skill: removed orphan #{wrapper_display(slug)}"
+      Skills::ROOTS.each do |root|
+        (existing_slugs(repo_root, fs, root) - keep).sort.each do |slug|
+          fs.remove(skill_dir(repo_root, root, slug).to_s)
+          stdout.puts "skill: removed orphan #{wrapper_display(root, slug)}"
+        end
       end
     end
 
-    # Slugs of the skill wrappers already on disk, derived from their directory
-    # names under `.claude/skills/`.
-    private def existing_slugs(repo_root : Path, fs : Filesystem) : Array(String)
-      fs.glob(repo_root.join(SKILLS_RELATIVE), "*/SKILL.md").map do |absolute|
+    # Slugs of the skill wrappers already on disk under one root, derived from
+    # their directory names.
+    private def existing_slugs(repo_root : Path, fs : Filesystem, root : Path) : Array(String)
+      fs.glob(repo_root.join(root), "*/SKILL.md").map do |absolute|
         Path[absolute].parent.basename
       end
     end
@@ -105,16 +110,16 @@ module Apropos
       repo_root.join(INDEX_RELATIVE)
     end
 
-    private def skill_dir(repo_root : Path, slug : String) : Path
-      repo_root.join(SKILLS_RELATIVE, slug)
+    private def skill_dir(repo_root : Path, root : Path, slug : String) : Path
+      repo_root.join(root, slug)
     end
 
-    private def wrapper_path(repo_root : Path, slug : String) : Path
-      skill_dir(repo_root, slug).join("SKILL.md")
+    private def wrapper_path(repo_root : Path, root : Path, slug : String) : Path
+      skill_dir(repo_root, root, slug).join("SKILL.md")
     end
 
-    private def wrapper_display(slug : String) : String
-      ".claude/skills/#{slug}/SKILL.md"
+    private def wrapper_display(root : Path, slug : String) : String
+      root.join(slug, "SKILL.md").to_posix.to_s
     end
   end
 end

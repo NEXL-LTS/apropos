@@ -397,6 +397,21 @@ describe Apropos::CLI do
       end
     end
 
+    it "wires only gemini when named alone" do
+      dir = File.tempname("apropos-cli-init-tool-gemini")
+      begin
+        Dir.mkdir_p(dir)
+        code, _, err = run(["init", "--tool", "gemini", "--repo-root", dir])
+        code.should eq(0)
+        err.should be_empty
+        File.exists?(File.join(dir, ".gemini/settings.json")).should be_true
+        File.exists?(File.join(dir, ".claude/settings.json")).should be_false
+        File.read(File.join(dir, ".gemini/settings.json")).should contain("apropos hook pre")
+      ensure
+        FileUtils.rm_rf(dir)
+      end
+    end
+
     it "rejects --repo-root without a value" do
       code, _, err = run(["init", "--repo-root"])
       code.should eq(1)
@@ -410,9 +425,9 @@ describe Apropos::CLI do
     end
 
     it "rejects an unknown --tool value" do
-      code, _, err = run(["init", "--tool", "gemini"])
+      code, _, err = run(["init", "--tool", "cursor"])
       code.should eq(1)
-      err.should contain("unknown tool 'gemini'")
+      err.should contain("unknown tool 'cursor'")
     end
 
     it "rejects an unknown option" do
