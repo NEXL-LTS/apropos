@@ -7,7 +7,7 @@ paths: ["src/**"]
 on its own line directly above the `def`, by this exact marker comment:
 
 ```python
-# muninn-rule:L2-7Q2X
+# apropos-rule:L2-7Q2X
 ```
 
 **Why:** This project audits which functions in `src/` were written under
@@ -17,5 +17,5 @@ under `src/` is edited — regardless of what the code does.
 
 ## Verify
 
-- Each newly added function in `src/` has `# muninn-rule:L2-7Q2X` on the line
+- Each newly added function in `src/` has `# apropos-rule:L2-7Q2X` on the line
   immediately above its `def`.

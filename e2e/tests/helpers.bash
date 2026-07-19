@@ -1,34 +1,34 @@
-# Shared helpers for the muninn e2e bats suite.
+# Shared helpers for the apropos e2e bats suite.
 #
 # Loaded by each *.bats file via `load helpers`. Provides the sample-repo
-# scaffolding, the muninn-on-PATH bootstrap, and the `claude -p` runner. The
+# scaffolding, the apropos-on-PATH bootstrap, and the `claude -p` runner. The
 # per-layer sentinels and prompts live in the individual layer*.bats files so
 # each layer's expectations stay self-contained.
 
 _e2e_dir()    { cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd; }
 _repo_root()  { cd "$(_e2e_dir)/.." && pwd; }
 
-# Ensure the muninn binary is built and resolves on PATH as the bare command
-# `muninn` (the sample's hooks call `muninn hook pre|post`). Idempotent: builds
-# only when bin/muninn is missing, then symlinks it into a stable gitignored dir.
-ensure_muninn() {
+# Ensure the apropos binary is built and resolves on PATH as the bare command
+# `apropos` (the sample's hooks call `apropos hook pre|post`). Idempotent: builds
+# only when bin/apropos is missing, then symlinks it into a stable gitignored dir.
+ensure_apropos() {
   local repo bin bindir
   repo="$(_repo_root)"
-  bin="$repo/bin/muninn"
+  bin="$repo/bin/apropos"
   [ -x "$bin" ] || ( cd "$repo" && make release >/dev/null )
   # Symlink into a run-scoped temp dir (auto-cleaned by bats, outside the repo)
-  # so the sample's bare `muninn hook ...` commands resolve without polluting
+  # so the sample's bare `apropos hook ...` commands resolve without polluting
   # the tree or the user's ~/.local/bin.
   bindir="$BATS_RUN_TMPDIR/bin"
   mkdir -p "$bindir"
-  ln -sf "$bin" "$bindir/muninn"
+  ln -sf "$bin" "$bindir/apropos"
   export PATH="$bindir:$PATH"
 }
 
 # Stand up an isolated sample repo in this test's temp dir and set $WORK.
-# Arg 1: "with" (muninn wired) or "without" (hooks + generated skills removed).
-# It is a git repo OUTSIDE this project so muninn's root resolution stops here
-# and resolves the sample's conventions, not muninn's own.
+# Arg 1: "with" (apropos wired) or "without" (hooks + generated skills removed).
+# It is a git repo OUTSIDE this project so apropos's root resolution stops here
+# and resolves the sample's conventions, not apropos's own.
 new_sample() {
   local mode="${1:-with}"
   WORK="$BATS_TEST_TMPDIR/work"
@@ -42,17 +42,17 @@ new_sample() {
       && git add -A \
       && git commit -qm sample
   ) >/dev/null
-  muninn generate --repo-root "$WORK" >/dev/null 2>&1
+  apropos generate --repo-root "$WORK" >/dev/null 2>&1
   if [ "$mode" = "without" ]; then
     printf '{"hooks":{}}\n' > "$WORK/.claude/settings.json"
     rm -rf "$WORK/.claude/skills"
-    rm -f "$WORK/.opencode/plugins/muninn.js"
+    rm -f "$WORK/.opencode/plugins/apropos.js"
     # Remove the sentinel-bearing convention docs themselves, not just the
     # delivery mechanism. Without this, a sufficiently agentic model (observed
     # with OpenCode's build agent, which readily runs `cat docs/conventions/...`
     # on its own initiative after reading AGENTS.md's pointer to that
     # directory) can discover the sentinel by direct exploration — a path that
-    # has nothing to do with muninn and would falsely fail the without-muninn
+    # has nothing to do with apropos and would falsely fail the without-apropos
     # control.
     rm -f "$WORK/docs/conventions/src-rule.md" \
           "$WORK/docs/conventions/stub-rule.md" \
@@ -128,7 +128,7 @@ require_live_opencode() {
 # error), or a result flagged `is_error` (e.g. not logged in, rate limited) — is
 # treated as "claude could not run" and SKIPs the test (and marks claude unusable
 # so later live tests skip immediately instead of each paying for a failed call).
-# Only a clean run (exit 0, is_error false) returns, so a genuine "muninn did not
+# Only a clean run (exit 0, is_error false) returns, so a genuine "apropos did not
 # influence the output" still fails loudly at the assertion.
 run_claude() {  # arg: prompt
   local dbg="$BATS_TEST_TMPDIR/hooks.log"
@@ -165,7 +165,7 @@ run_claude() {  # arg: prompt
 }
 
 # Run opencode non-interactively in $WORK. The plugin at
-# .opencode/plugins/muninn.js bridges the hook calls; muninn must be on PATH.
+# .opencode/plugins/apropos.js bridges the hook calls; apropos must be on PATH.
 # Stdout is written to $WORK/_oc_out.txt; a nonzero exit skips the test.
 run_opencode() {  # arg: prompt
   local model_args=()

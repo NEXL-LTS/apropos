@@ -1,15 +1,15 @@
-# muninn end-to-end test
+# apropos end-to-end test
 
-A [bats-core](https://github.com/bats-core/bats-core) suite that runs muninn
+A [bats-core](https://github.com/bats-core/bats-core) suite that runs apropos
 against live Claude Code and OpenCode and asserts what the model actually writes.
-It is organized **by layer**; each layer runs the same with-muninn /
-without-muninn contrast for both CLIs.
+It is organized **by layer**; each layer runs the same with-apropos /
+without-apropos contrast for both CLIs.
 
 ## Structure
 
 ```
 tests/
-  helpers.bash  # sample scaffolding, muninn-on-PATH, claude/opencode runners
+  helpers.bash  # sample scaffolding, apropos-on-PATH, claude/opencode runners
   layer2.bats   # path-scoped (src/**) — 3 Claude + 3 OpenCode tests
   layer3.bats   # construct-scoped (NotImplementedError) — 3 Claude + 3 OpenCode tests
   layer4.bats   # intent skill (.claude/skills/) — 3 Claude + 3 OpenCode tests
@@ -17,16 +17,16 @@ tests/
 
 [`project/`](./project) is a self-contained sample codebase with a convention
 document on every layer, each carrying a unique **sentinel token**. A sentinel
-is arbitrary, so the model can only emit it when muninn delivered that
+is arbitrary, so the model can only emit it when apropos delivered that
 convention — making it a reliable signal despite LLM nondeterminism. The layers
 sit on non-overlapping paths so each sentinel is attributable to exactly one
 convention.
 
 | Layer | Trigger | Sentinel | Target file |
 | --- | --- | --- | --- |
-| 2 Path-scoped | editing `src/**` | `muninn-rule:L2-7Q2X` | `src/util.py` |
-| 3 Construct-scoped | `NotImplementedError` | `muninn-rule:L3-K9F4` | `scripts/jobs.py` |
-| 4 Intent skill | "add an arithmetic operation" | `muninn-rule:L4-Q7X2` | `lib/calc.py` |
+| 2 Path-scoped | editing `src/**` | `apropos-rule:L2-7Q2X` | `src/util.py` |
+| 3 Construct-scoped | `NotImplementedError` | `apropos-rule:L3-K9F4` | `scripts/jobs.py` |
+| 4 Intent skill | "add an arithmetic operation" | `apropos-rule:L4-Q7X2` | `lib/calc.py` |
 
 ## Running
 
@@ -42,15 +42,15 @@ image (resolved via `BATS_LIB_PATH`), so nothing is fetched at run time.
 ## The three tests per layer
 
 Each test copies the sample into an isolated temp git repo (bats'
-`BATS_TEST_TMPDIR`, outside this repo) with a freshly built `muninn` on PATH.
+`BATS_TEST_TMPDIR`, outside this repo) with a freshly built `apropos` on PATH.
 For each layer, both Claude Code and OpenCode run the same three tests:
 
 1. **delivery (deterministic, no LLM, no network).** Pipe a real hook payload
-   into `muninn hook pre`/`post` and assert the rule + sentinel come back (or,
+   into `apropos hook pre`/`post` and assert the rule + sentinel come back (or,
    for L4, that the skill wrapper and source doc exist). Always runs.
-2. **with muninn (live).** Run the CLI against the wired sample and assert the
+2. **with apropos (live).** Run the CLI against the wired sample and assert the
    sentinel lands in the edited file.
-3. **without muninn (live control).** Run the same prompt with muninn removed
+3. **without apropos (live control).** Run the same prompt with apropos removed
    and assert the sentinel does **not** appear.
 
 ## CI-safety and credentials

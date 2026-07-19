@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# muninn end-to-end test runner.
+# apropos end-to-end test runner.
 #
-# Runs the layered bats suite in e2e/tests/. It proves, per layer, that muninn
+# Runs the layered bats suite in e2e/tests/. It proves, per layer, that apropos
 # delivers its convention and steers a real `claude` run — see e2e/README.md.
 #
 # `bats` and the bats-support/bats-assert libraries are provided by the

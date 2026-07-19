@@ -57,10 +57,10 @@ jobs:
         run: ./scripts/coverage.sh
 
       - name: Unreachable-code check (paired with coverage)
-        run: crystal tool unreachable src/muninn.cr
+        run: crystal tool unreachable src/apropos.cr
 
       - name: Release smoke build
-        run: crystal build --release src/muninn.cr -o bin/muninn
+        run: crystal build --release src/apropos.cr -o bin/apropos
 
       # Self-check: the repo dogfoods the standard, so the built
       # binary must find its own generated skill wrappers byte-identical and its
@@ -68,8 +68,8 @@ jobs:
       # hand-edited SKILL.md or a malformed rule doc landing on main.
       - name: Self-check (generate --check && lint)
         run: |
-          ./bin/muninn generate --check
-          ./bin/muninn lint
+          ./bin/apropos generate --check
+          ./bin/apropos lint
 
   # Build the devcontainer image so a change to .devcontainer/Dockerfile (e.g.
   # the crystal/kcov/bats toolchain) can't break the dev environment unnoticed.
@@ -88,13 +88,13 @@ jobs:
           context: .
           file: .devcontainer/Dockerfile
           load: true
-          tags: muninn-devcontainer:ci
+          tags: apropos-devcontainer:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Smoke-check the installed toolchain
         run: |
-          docker run --rm muninn-devcontainer:ci bash -c '
+          docker run --rm apropos-devcontainer:ci bash -c '
             set -e
             crystal --version
             shards --version

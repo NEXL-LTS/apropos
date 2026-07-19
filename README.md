@@ -1,21 +1,27 @@
-# muninn
+# apropos
 
-**Deliver the right documentation to the right moment.**
+**Context injection for AI CLI coding tools — deliver the right documentation at
+exactly the right moment.**
 
-Muninn ("memory") is one of Odin's two ravens: it flies out over the world,
-gathers what is true, and whispers it into Odin's ear at the right moment — which
-is what this tool does with your conventions. It is a single deterministic binary
-that keeps a layered documentation structure working: it compiles convention-doc
+*Apropos* — apt, pertinent, timely; said or done at exactly the right moment.
+That's the whole design brief: apropos is a single deterministic binary that
+keeps a layered documentation structure working. It compiles convention-doc
 frontmatter into a trigger index, generates skill wrappers, serves as a Claude
-Code hook handler that injects path- and construct-scoped rules at edit time, and
-resolves the conventions that apply to a diff for review.
+Code hook handler that injects path- and construct-scoped rules at edit time,
+and resolves the conventions that apply to a diff for review.
 
-One large always-loaded instruction file gets skimmed and forgotten. Muninn keeps
-the guidance small and just-in-time: rules live in
-[`docs/conventions/`](./docs/conventions/) as markdown with YAML frontmatter, and
-muninn delivers each one exactly when the file or construct it governs is being
-touched. It makes no LLM calls — triggering is deterministic — and ships as a
-static Linux binary.
+One large always-loaded instruction file gets skimmed and forgotten. apropos
+keeps the guidance small and just-in-time: rules live in
+[`docs/conventions/`](./docs/conventions/) as markdown with YAML frontmatter,
+and apropos delivers each one exactly when the file or construct it governs is
+being touched — nothing sooner, nothing later. It makes no LLM calls —
+triggering is deterministic — and ships as a static Linux binary.
+
+## Supported CLI agents
+
+- **Claude Code** — PreToolUse/PostToolUse hooks, `AGENTS.md`/`CLAUDE.md`, and generated `SKILL.md` wrappers.
+- **OpenCode** — `tool.execute.before`/`tool.execute.after` plugin hooks, same root file and generated skills.
+- **Gemini CLI**, **Codex**, **Aider**, **GitHub Copilot CLI**, and **Cursor CLI** — coming soon.
 
 ## Install
 
@@ -24,8 +30,8 @@ curl -fsSL https://raw.githubusercontent.com/NEXL-LTS/muninn-rules/main/install.
 ```
 
 The installer resolves the latest release, verifies its SHA256 checksum, and
-installs `muninn` to `$HOME/.local/bin` (override with `MUNINN_BIN_DIR`; pin a tag
-with `MUNINN_VERSION`). v1 ships a fully static Linux x86_64 binary; macOS and
+installs `apropos` to `$HOME/.local/bin` (override with `APROPOS_BIN_DIR`; pin a tag
+with `APROPOS_VERSION`). v1 ships a fully static Linux x86_64 binary; macOS and
 Windows are on the roadmap.
 
 From source (requires [Crystal](https://crystal-lang.org) ≥ 1.20):
@@ -37,20 +43,20 @@ make install          # builds the release binary into $PREFIX/bin (default ~/.l
 ## Quickstart
 
 ```sh
-muninn init                # bootstrap docs/conventions/, hook wiring, .gitignore
+apropos init                # bootstrap docs/conventions/, hook wiring, .gitignore
 $EDITOR docs/conventions/  # write rules (see docs/conventions/README.md)
-muninn generate            # compile the index + skill wrappers
-muninn lint                # validate the structure
-muninn doctor              # check the environment and hook wiring
+apropos generate            # compile the index + skill wrappers
+apropos lint                # validate the structure
+apropos doctor              # check the environment and hook wiring
 ```
 
-`muninn init` wires two Claude Code hooks into `.claude/settings.json`:
-`muninn hook pre` (PreToolUse → Layer 2, path-scoped) and `muninn hook post`
+`apropos init` wires two Claude Code hooks into `.claude/settings.json`:
+`apropos hook pre` (PreToolUse → Layer 2, path-scoped) and `apropos hook post`
 (PostToolUse → Layer 3, construct-scoped). You never run these by hand — Claude
 Code calls them, and they inject the matching conventions as context.
 
-Run `muninn help` for the full mental model (also `muninn help --format json` for
-the machine-readable form, or `muninn help <command>`).
+Run `apropos help` for the full mental model (also `apropos help --format json` for
+the machine-readable form, or `apropos help <command>`).
 
 ## How it works
 
@@ -65,7 +71,7 @@ for the full model:
 | 3 Construct-scoped | An API / code construct | Written **content** (regex) | PostToolUse hook |
 | 4 Intent skills | Task-nature guidance | Semantic skill match | Generated `SKILL.md` |
 
-`muninn generate` compiles the frontmatter in `docs/conventions/` into a cached
+`apropos generate` compiles the frontmatter in `docs/conventions/` into a cached
 trigger index and committed skill wrappers. At edit time, the hooks look up the
 matching rules and inject them. For review, the same frontmatter resolves which
 conventions apply to a diff, so review prompts carry zero copies of the rules.
@@ -76,7 +82,7 @@ Layer 2 delivery fires on **PreToolUse**, which depends on Claude Code supportin
 `hookSpecificOutput.additionalContext` for that event. This arrived after the
 PostToolUse path, so **older Claude Code releases may not inject Layer 2 context.**
 
-- `muninn doctor` checks the installed `claude --version` and warns if PreToolUse
+- `apropos doctor` checks the installed `claude --version` and warns if PreToolUse
   injection may be unavailable.
 - If it is unavailable, Layer 2 delivery **degrades gracefully to PostToolUse**
   with no loss of correctness — the path is still knowable after the write — so
@@ -87,14 +93,14 @@ PostToolUse path, so **older Claude Code releases may not inject Layer 2 context
 
 | Command | Purpose |
 | --- | --- |
-| `muninn init` | Bootstrap the convention structure into a repo (idempotent; `--force`, `--example`, `--claude-symlink`, `--dry-run`). |
-| `muninn generate` | Compile frontmatter into the trigger index and skill wrappers. `--check` is the CI drift gate. |
-| `muninn hook pre` / `hook post` | Claude Code hook handlers (Layer 2 / Layer 3). Fail open — never block an edit. |
-| `muninn match <paths>` | Resolve the conventions applying to given files (`--format paths\|json\|full`). |
-| `muninn review [range]` | Resolve conventions for a git diff range as a review manifest (`--format md\|json`). |
-| `muninn lint` | Validate frontmatter, skill descriptions, root-file budget, and generated-artifact freshness (`--strict`). |
-| `muninn doctor` | Check hook wiring, Claude Code version, index freshness, and cache writability. |
-| `muninn help` | The dual-audience mental model (human and agent), single-sourced with `--format json`. |
+| `apropos init` | Bootstrap the convention structure into a repo (idempotent; `--force`, `--example`, `--claude-symlink`, `--dry-run`). |
+| `apropos generate` | Compile frontmatter into the trigger index and skill wrappers. `--check` is the CI drift gate. |
+| `apropos hook pre` / `hook post` | Claude Code hook handlers (Layer 2 / Layer 3). Fail open — never block an edit. |
+| `apropos match <paths>` | Resolve the conventions applying to given files (`--format paths\|json\|full`). |
+| `apropos review [range]` | Resolve conventions for a git diff range as a review manifest (`--format md\|json`). |
+| `apropos lint` | Validate frontmatter, skill descriptions, root-file budget, and generated-artifact freshness (`--strict`). |
+| `apropos doctor` | Check hook wiring, Claude Code version, index freshness, and cache writability. |
+| `apropos help` | The dual-audience mental model (human and agent), single-sourced with `--format json`. |
 
 Every command takes `--help`, `--repo-root <dir>` (default: walk up to the nearest
 `.git`), and documents its exit codes.
@@ -115,10 +121,10 @@ Every command takes `--help`, `--repo-root <dir>` (default: walk up to the neare
 
 - No Cursor `.mdc` / Copilot `.instructions.md` output — the frontmatter is
   designed so these are pure additional emitters later.
-- No enforcement of code style — that belongs in linters/formatters, which muninn
+- No enforcement of code style — that belongs in linters/formatters, which apropos
   does not replace.
 - No LLM calls; no daemon/watch mode (every invocation is a fast one-shot).
-- No hook management beyond its own entries: muninn edits only the hook entries it
+- No hook management beyond its own entries: apropos edits only the hook entries it
   owns in `.claude/settings.json`, marked and idempotent.
 
 ## Roadmap
@@ -130,8 +136,8 @@ for CI (GitHub PR comments).
 
 ## Development
 
-This repo dogfoods the standard on itself — `docs/conventions/` holds muninn's own
-scoped guidance, delivered by muninn's own hooks. Use `make`:
+This repo dogfoods the standard on itself — `docs/conventions/` holds apropos's own
+scoped guidance, delivered by apropos's own hooks. Use `make`:
 
 - `make deps` — install shard dependencies
 - `make build` — build the debug binary; `make release` for the release build
