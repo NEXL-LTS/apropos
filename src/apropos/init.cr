@@ -58,7 +58,7 @@ module Apropos
       write_examples(repo_root, fs, options, stdout) if options.example
       link_claude(repo_root, fs, options, stdout) if options.claude_symlink
       scaffold_opencode(repo_root, fs, options, stdout) if tools.includes?("opencode")
-      stdout.puts NEXT_STEPS_HINT
+      stdout.puts NEXT_STEPS_HINT unless options.dry_run
       0
     rescue ex : Apropos::Error
       stderr.puts "apropos init: #{ex.message}"

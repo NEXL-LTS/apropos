@@ -84,6 +84,7 @@ describe Apropos::Init do
       _, stdout, _ = run_init(fs, Apropos::Init::Options.new(dry_run: true))
       stdout.should contain("would create docs/conventions/README.md")
       stdout.should contain("would create .claude/settings.json")
+      stdout.should_not contain("README.md#bootstrapping-from-an-existing-codebase")
       fs.files.should be_empty
     end
   end
