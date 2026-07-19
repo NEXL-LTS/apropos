@@ -17,6 +17,8 @@
 set -euo pipefail
 
 E2E_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$E2E_DIR/.." && pwd)"
+APROPOS_BIN="$REPO_ROOT/bin/apropos"
 
 # bats resolves `bats_load_library` via BATS_LIB_PATH. The devcontainer image
 # sets it (ENV), but default it to the image's install location too, so the suite
@@ -29,5 +31,16 @@ if ! command -v bats >/dev/null 2>&1; then
   echo "!! or install bats-core + bats-support + bats-assert to run this suite."
   exit 127
 fi
+
+# e2e/project/.claude and .opencode are generated, not committed (see its
+# .gitignore) — regenerate them here so the fixture is always wired for both
+# agents before bats copies it per test, regardless of whether this machine
+# has claude/opencode installed (helpers.bash's require_live_<x> is what
+# decides whether the *live* tests run; the wiring itself must exist either
+# way). `--tool` is used explicitly rather than left to auto-detect for
+# exactly that reason. Both commands are idempotent.
+[ -x "$APROPOS_BIN" ] || ( cd "$REPO_ROOT" && make release >/dev/null )
+"$APROPOS_BIN" init --tool claude --tool opencode --repo-root "$E2E_DIR/project" >/dev/null
+"$APROPOS_BIN" generate --repo-root "$E2E_DIR/project" >/dev/null
 
 exec bats "$@" "$E2E_DIR/tests"

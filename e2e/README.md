@@ -47,8 +47,13 @@ make e2e          # or: bash e2e/run.sh
 
 `bats` and its `bats-support`/`bats-assert` libraries ship in the devcontainer
 image (resolved via `BATS_LIB_PATH`), so nothing is fetched at run time.
-`run.sh` invokes `bats` on [`tests/`](./tests); extra flags pass through, e.g.
-`bash e2e/run.sh --filter 'Layer 2'`.
+Before invoking `bats`, `run.sh` runs `apropos init --tool claude --tool
+opencode` and `apropos generate` against `project/` itself, so its hook
+wiring (`.claude/`, `.opencode/`) is always freshly generated rather than
+committed (see `project/.gitignore`) — that way the fixture is fully wired
+regardless of which agents happen to be installed on the machine running the
+suite. `run.sh` invokes `bats` on [`tests/`](./tests); extra flags pass
+through, e.g. `bash e2e/run.sh --filter 'Layer 2'`.
 
 ## The two tests per layer, per agent
 
