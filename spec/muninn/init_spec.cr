@@ -157,6 +157,54 @@ describe Muninn::Init do
     end
   end
 
+  describe "--opencode" do
+    it "creates the OpenCode plugin when --opencode is given" do
+      fs = InMemoryFS.new
+      code, stdout, stderr = run_init(fs, Muninn::Init::Options.new(opencode: true))
+      code.should eq(0)
+      stderr.should be_empty
+      plugin = fs.files["/repo/.opencode/plugins/muninn.js"]
+      plugin.should contain("tool.execute.before")
+      plugin.should contain("tool.execute.after")
+      plugin.should contain("noReply: true")
+      plugin.should contain(%(["muninn", "hook", sub]))
+      # OpenCode delivers tool args in the second callback parameter; the plugin
+      # must read from there (falling back to input) or Layer 2 never fires.
+      plugin.should contain("async (input, output)")
+      plugin.should contain("output?.args ?? input.args")
+      stdout.should contain(".opencode/plugins/muninn.js")
+    end
+
+    it "does not create the OpenCode plugin without --opencode" do
+      fs = InMemoryFS.new
+      run_init(fs)
+      fs.files.has_key?("/repo/.opencode/plugins/muninn.js").should be_false
+    end
+
+    it "is idempotent — re-running with --opencode reports current" do
+      fs = InMemoryFS.new
+      run_init(fs, Muninn::Init::Options.new(opencode: true))
+      plugin_before = fs.files["/repo/.opencode/plugins/muninn.js"]
+      _, stdout, _ = run_init(fs, Muninn::Init::Options.new(opencode: true))
+      stdout.should contain("current  .opencode/plugins/muninn.js")
+      fs.files["/repo/.opencode/plugins/muninn.js"].should eq(plugin_before)
+    end
+
+    it "reports would-create under --dry-run without writing" do
+      fs = InMemoryFS.new
+      _, stdout, _ = run_init(fs, Muninn::Init::Options.new(opencode: true, dry_run: true))
+      stdout.should contain("would create .opencode/plugins/muninn.js")
+      fs.files.has_key?("/repo/.opencode/plugins/muninn.js").should be_false
+    end
+
+    it "scaffolds both Claude and OpenCode artefacts simultaneously" do
+      fs = InMemoryFS.new
+      run_init(fs, Muninn::Init::Options.new(opencode: true))
+      fs.files.has_key?("/repo/.claude/settings.json").should be_true
+      fs.files.has_key?("/repo/.opencode/plugins/muninn.js").should be_true
+    end
+  end
+
   describe ".gitignore merge" do
     it "appends the cache entry when missing, adding a separating newline" do
       fs = InMemoryFS.new({GITIGNORE => "/bin\n/lib"})

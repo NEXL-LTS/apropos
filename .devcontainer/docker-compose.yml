@@ -11,6 +11,13 @@ services:
       - ${HOME}/.claude.json:/home/vscode/.claude.json
       - ${HOME}/.ssh:/home/vscode/.ssh:ro
       - claude-data:/home/vscode/.claude
+      # `opencode auth login` writes the credential to ~/.local/share/opencode
+      # (confirmed via `opencode debug paths`), NOT ~/.config/opencode — that
+      # directory only holds config (opencode.json, AGENTS.md). Mounting only
+      # .config here silently drops auth on every rebuild, so live OpenCode e2e
+      # tests (e2e/tests/layer*.bats) always skip for "not authenticated".
+      - opencode-data:/home/vscode/.local/share/opencode
+      - opencode-config:/home/vscode/.config/opencode
       - crystal-cache:/home/vscode/.cache/crystal
     # kcov (the coverage gate) drives the spec binary under ptrace and calls
     # personality() to disable ASLR. The default container sandbox blocks both,
@@ -23,4 +30,6 @@ services:
 
 volumes:
   claude-data:
+  opencode-data:
+  opencode-config:
   crystal-cache:

@@ -14,9 +14,10 @@ module Muninn
   module Doctor
     extend self
 
-    INDEX_RELATIVE    = Path[".cache", "muninn", "index.json"]
-    SETTINGS_RELATIVE = Path[".claude", "settings.json"]
-    PROBE_RELATIVE    = Path[".cache", "muninn", ".doctor-probe"]
+    INDEX_RELATIVE           = Path[".cache", "muninn", "index.json"]
+    SETTINGS_RELATIVE        = Path[".claude", "settings.json"]
+    OPENCODE_PLUGIN_RELATIVE = Path[".opencode", "plugins", "muninn.js"]
+    PROBE_RELATIVE           = Path[".cache", "muninn", ".doctor-probe"]
 
     MUNINN_HOOK_PREFIX = "muninn hook"
 
@@ -32,6 +33,7 @@ module Muninn
         settings_check(repo_root, fs),
         muninn_check(env),
         claude_check(env),
+        opencode_check(repo_root, fs, env),
         index_check(repo_root, fs),
         cache_check(repo_root, fs),
       ]
@@ -117,6 +119,21 @@ module Muninn
 
     private def min_version : SemanticVersion
       SemanticVersion.parse(MIN_CLAUDE_VERSION)
+    end
+
+    # Check for the OpenCode binary and the generated plugin that bridges
+    # `muninn hook` into OpenCode's plugin event system. Advisory only: never
+    # fails, so a Claude-only repo is not penalised.
+    private def opencode_check(repo_root : Path, fs : Filesystem, env : Environment) : Check
+      unless env.which("opencode")
+        return Check.new(:ok, "opencode", "not on PATH; skipped plugin check")
+      end
+      plugin = repo_root.join(OPENCODE_PLUGIN_RELATIVE).to_s
+      if fs.exists?(plugin)
+        Check.new(:ok, "opencode", "plugin wired")
+      else
+        Check.new(:warn, "opencode", "plugin absent; run `muninn init --opencode`")
+      end
     end
 
     private def index_check(repo_root : Path, fs : Filesystem) : Check

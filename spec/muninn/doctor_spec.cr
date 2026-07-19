@@ -144,6 +144,26 @@ describe Muninn::Doctor do
     end
   end
 
+  describe "opencode check" do
+    it "is ok (skipped) when opencode is not on PATH" do
+      _, stdout = run_doctor(InMemoryFS.new, FakeEnv.new)
+      stdout.should contain("opencode: not on PATH; skipped plugin check")
+    end
+
+    it "warns when opencode is on PATH but the plugin is absent" do
+      env = FakeEnv.new(present: {"opencode" => "/usr/bin/opencode"})
+      _, stdout = run_doctor(InMemoryFS.new, env)
+      stdout.should contain("warn  opencode: plugin absent; run `muninn init --opencode`")
+    end
+
+    it "is ok when opencode is on PATH and the plugin is present" do
+      env = FakeEnv.new(present: {"opencode" => "/usr/bin/opencode"})
+      fs = InMemoryFS.new({"/repo/.opencode/plugins/muninn.js" => "// plugin"})
+      _, stdout = run_doctor(fs, env)
+      stdout.should contain("ok    opencode: plugin wired")
+    end
+  end
+
   describe "index check" do
     it "warns when the index is missing" do
       _, stdout = run_doctor(InMemoryFS.new, FakeEnv.new)
