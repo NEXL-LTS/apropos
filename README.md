@@ -54,7 +54,7 @@ sources):
 ARG APROPOS_VERSION=v0.1.1
 
 RUN curl -fsSL "https://raw.githubusercontent.com/NEXL-LTS/apropos/${APROPOS_VERSION}/install.sh" \
-      | APROPOS_BIN_DIR=/usr/local/bin sh
+      | APROPOS_VERSION=${APROPOS_VERSION} APROPOS_BIN_DIR=/usr/local/bin sh
 ```
 
 The script detects the build's CPU architecture itself (`uname -m`) and
