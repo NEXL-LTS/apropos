@@ -31,13 +31,41 @@ curl -fsSL https://raw.githubusercontent.com/NEXL-LTS/apropos/main/install.sh | 
 
 The installer resolves the latest release, verifies its SHA256 checksum, and
 installs `apropos` to `$HOME/.local/bin` (override with `APROPOS_BIN_DIR`; pin a tag
-with `APROPOS_VERSION`). v1 ships a fully static Linux x86_64 binary; macOS and
-Windows are on the roadmap.
+with `APROPOS_VERSION`). v1 ships fully static Linux x86_64 and arm64 binaries
+(the installer picks the right one from `uname -m`); macOS and Windows are on
+the roadmap.
 
 From source (requires [Crystal](https://crystal-lang.org) ≥ 1.20):
 
 ```sh
 make install          # builds the release binary into $PREFIX/bin (default ~/.local/bin)
+```
+
+### Pinning a version in another repo's Dockerfile
+
+Fetch `install.sh` itself from the tagged ref (not `main`) so the installer
+script and the binary version can never drift apart, and install straight
+into `/usr/local/bin` — it's already on `PATH` in virtually every base image,
+unlike the default `$HOME/.local/bin`, which non-interactive `RUN` layers
+never add to `PATH` (that happens in a shell profile only an interactive shell
+sources):
+
+```dockerfile
+ARG APROPOS_VERSION=v0.1.0
+
+RUN curl -fsSL "https://raw.githubusercontent.com/NEXL-LTS/apropos/${APROPOS_VERSION}/install.sh" \
+      | APROPOS_BIN_DIR=/usr/local/bin sh
+```
+
+The script detects the build's CPU architecture itself (`uname -m`) and
+downloads `apropos-linux-x86_64` or `apropos-linux-arm64` accordingly, so the
+same Dockerfile line works unmodified for `docker buildx build --platform
+linux/amd64` and `linux/arm64`. It also fails the build (non-zero exit) if
+the downloaded binary can't execute, checksum verification fails, or the
+architecture is unsupported — never a silent no-op. Confirm it landed with:
+
+```dockerfile
+RUN apropos --version
 ```
 
 ## Quickstart

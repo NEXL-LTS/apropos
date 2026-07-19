@@ -4,7 +4,7 @@ on:
   push:
     tags: ["v*"]
 
-# Written as a matrix from day one with only the Linux leg enabled.
+# Written as a matrix from day one with only the Linux legs enabled.
 # Roadmap legs (disabled until their own CI is green):
 #   - macOS arm64/x86_64 (dynamic against system libs; macOS has no static libc)
 #   - Windows x86_64 (Crystal Windows support is Preview — no production promise)
@@ -15,6 +15,11 @@ jobs:
       matrix:
         include:
           - { name: apropos-linux-x86_64, runner: ubuntu-latest }
+          # Native arm64 runner (free on public repos) rather than QEMU
+          # emulation under docker run — same static-musl build, just a
+          # different host architecture, and Docker pulls the matching
+          # crystallang/crystal:1.20-alpine manifest automatically.
+          - { name: apropos-linux-arm64, runner: ubuntu-24.04-arm }
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
