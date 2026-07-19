@@ -45,6 +45,11 @@ rule doc itself) so there's nothing to discover by exploring the repo.
 make e2e          # or: bash e2e/run.sh
 ```
 
+**Authenticate with each CLI first.** The live tests need a working, logged-in
+`claude` and `opencode` — see [CI-safety and credentials](#ci-safety-and-credentials)
+below for how. Skip this and the corresponding live tests don't fail; they
+just skip cleanly, which can look like a pass at a glance.
+
 `bats` and its `bats-support`/`bats-assert` libraries ship in the devcontainer
 image (resolved via `BATS_LIB_PATH`), so nothing is fetched at run time.
 Before invoking `bats`, `run.sh` runs `apropos init --tool claude --tool
