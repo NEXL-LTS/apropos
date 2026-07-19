@@ -132,7 +132,7 @@ module Apropos
       if fs.exists?(plugin)
         Check.new(:ok, "opencode", "plugin wired")
       else
-        Check.new(:warn, "opencode", "plugin absent; run `apropos init --opencode`")
+        Check.new(:warn, "opencode", "plugin absent; run `apropos init --tool opencode`")
       end
     end
 

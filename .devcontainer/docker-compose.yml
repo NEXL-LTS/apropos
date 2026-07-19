@@ -18,6 +18,17 @@ services:
       # tests (e2e/tests/layer*.bats) always skip for "not authenticated".
       - opencode-data:/home/vscode/.local/share/opencode
       - opencode-config:/home/vscode/.config/opencode
+      # Gemini CLI, Codex CLI, GitHub Copilot CLI, and Cursor CLI each keep
+      # their OAuth/session credentials under a single dotdir in $HOME
+      # (confirmed by probing each CLI directly — none split config from
+      # auth the way OpenCode does), so one named volume per CLI is enough.
+      # Each persists once you run its login flow inside the container:
+      # `gemini` (browser OAuth on first prompt), `codex login`,
+      # `copilot` + `/login`, `agent login`.
+      - gemini-data:/home/vscode/.gemini
+      - codex-data:/home/vscode/.codex
+      - copilot-data:/home/vscode/.copilot
+      - cursor-data:/home/vscode/.cursor
       - crystal-cache:/home/vscode/.cache/crystal
     # kcov (the coverage gate) drives the spec binary under ptrace and calls
     # personality() to disable ASLR. The default container sandbox blocks both,
@@ -32,4 +43,8 @@ volumes:
   claude-data:
   opencode-data:
   opencode-config:
+  gemini-data:
+  codex-data:
+  copilot-data:
+  cursor-data:
   crystal-cache:

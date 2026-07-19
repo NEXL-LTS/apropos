@@ -4,23 +4,32 @@ description: "Use when adding a new arithmetic operation to the calc library"
 ---
 # Adding an arithmetic operation (Layer 4 — intent skill)
 
-When adding a new operation to the calc library at `lib/calc.py`:
+When adding a new operation to the calc library at `lib/calc.py`, don't just
+define a bare function — register it in the dispatch table so it's callable
+by name:
 
-1. Place this exact marker comment on the line immediately above the new
-   function's `def`:
+```python
+from lib.registry import register_operation
 
-   ```python
-   # apropos-rule:L4-Q7X2
-   ```
 
-2. Keep the function pure — take operands as arguments, return the result, no
-   I/O — and give it a one-line docstring.
+def divide(a, b):
+    """Return a divided by b."""
+    return a / b
+
+
+register_operation("divide", divide)
+```
+
+Keep the function itself pure — operands in, result out, no I/O — with a
+one-line docstring.
 
 **Why:** This guidance is triggered by the *intent* of the task ("add an
-arithmetic operation"), not by a path or a code construct, so it is delivered as
-a skill. The `L4-Q7X2` tag lets the audit tool confirm the workflow was followed.
+arithmetic operation"), not by a path or a code construct, so it is delivered
+as a skill. `add`/`multiply` predate the registry and haven't been migrated;
+new operations must register going forward so the calculator can dispatch by
+name.
 
 ## Verify
 
-- The new operation is a pure function with a docstring and carries
-  `# apropos-rule:L4-Q7X2` directly above its `def`.
+- The new operation is a pure function with a docstring, and is registered
+  via `register_operation("<name>", <fn>)` imported from `lib/registry.py`.

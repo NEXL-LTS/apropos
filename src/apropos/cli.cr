@@ -126,12 +126,13 @@ module Apropos
       property? example = false
       property? claude_symlink = false
       property? dry_run = false
-      property? opencode = false
+      property tools : Set(String)? = nil
       property override : String? = nil
     end
 
     # `apropos init [--force] [--example] [--claude-symlink] [--dry-run]
-    # [--opencode] [--repo-root DIR]`. An authoring command: fails *closed*.
+    # [--tool claude|opencode] [--repo-root DIR]`. An authoring command: fails
+    # *closed*. `--tool` is repeatable; omit it entirely to auto-detect.
     private def handle_init(args : Array(String)) : Int32
       opts = InitArgs.new
       if code = parse_init_args(args, opts)
@@ -144,8 +145,8 @@ module Apropos
       options = Init::Options.new(
         force: opts.force?, example: opts.example?,
         claude_symlink: opts.claude_symlink?, dry_run: opts.dry_run?,
-        opencode: opts.opencode?)
-      Init.run(root, Filesystem::Real.new, options, @stdout, @stderr)
+        tools: opts.tools)
+      Init.run(root, Filesystem::Real.new, Environment::Real.new, options, @stdout, @stderr)
     end
 
     private def parse_init_args(args : Array(String), opts : InitArgs) : Int32?
@@ -156,7 +157,11 @@ module Apropos
         when "--example"        then opts.example = true
         when "--claude-symlink" then opts.claude_symlink = true
         when "--dry-run"        then opts.dry_run = true
-        when "--opencode"       then opts.opencode = true
+        when "--tool"
+          index += 1
+          if code = parse_init_tool(args[index]?, opts)
+            return code
+          end
         when "--repo-root"
           index += 1
           value = args[index]?
@@ -167,6 +172,19 @@ module Apropos
         end
         index += 1
       end
+      nil
+    end
+
+    # `--tool` validation lives here rather than inline in the parse loop so
+    # that loop's cyclomatic complexity stays under the gate.
+    private def parse_init_tool(value : String?, opts : InitArgs) : Int32?
+      # A missing value means the next token is another flag (or nothing) —
+      # treat it as "no value" rather than reporting it as an unknown tool.
+      return command_error("init", "--tool requires a value") if value.nil? || value.starts_with?("--")
+      unless Init::KNOWN_TOOLS.includes?(value)
+        return command_error("init", "unknown tool '#{value}' (#{Init::KNOWN_TOOLS.to_a.sort.join("|")})")
+      end
+      opts.tools = (opts.tools || Set(String).new) << value
       nil
     end
 

@@ -1,9 +1,64 @@
 # Shared helpers for the apropos e2e bats suite.
 #
 # Loaded by each *.bats file via `load helpers`. Provides the sample-repo
-# scaffolding, the apropos-on-PATH bootstrap, and the `claude -p` runner. The
-# per-layer sentinels and prompts live in the individual layer*.bats files so
-# each layer's expectations stay self-contained.
+# scaffolding, the apropos-on-PATH bootstrap, the live CLI runners, and the
+# agent-agnostic live test matrix (register_live_tests). The per-layer
+# expected artifacts and prompts live in layers.bats so each layer's
+# expectations stay self-contained.
+#
+# Deterministic delivery checks (hook payload -> injected rule, generate ->
+# skill wrapper) live in the Crystal spec suite (spec/apropos/hook_spec.cr,
+# spec/integration/hook_spec.cr, spec/apropos/generate_spec.cr,
+# spec/integration/generate_spec.cr), not here — this suite only proves a
+# real CLI agent's own output is actually steered.
+
+# Registered CLI agents for the live matrix: "name|require_live_fn|run_fn".
+# Adding a CLI agent means adding one entry here plus its require_live_<x>/
+# run_<x> pair below — no per-layer test to write.
+E2E_AGENTS=(
+  "Claude|require_live_claude|run_claude"
+  "OpenCode|require_live_opencode|run_opencode"
+)
+
+# Register the live with/without pair of tests for one layer, once per agent
+# in E2E_AGENTS. Equivalent to what `@test "..." { ... }` expands to (see
+# bats-preprocess) but driven from a loop, so the layer files stay agent-count
+# agnostic.
+#
+# Args: layer label (e.g. "Layer 2", "Layer 3 (path+content)"), expected-
+# artifact var name, prompt var name, target file (repo-relative, e.g.
+# src/util.py).
+register_live_tests() {
+  local layer="$1" expect_var="$2" prompt_var="$3" target="$4"
+  # Sanitize to a valid bash identifier fragment — labels (and, below, agent
+  # display names) may contain spaces or punctuation (e.g.
+  # "Layer 3 (path+content)", or a future "GitHub Copilot" entry).
+  local slug="${layer//[^A-Za-z0-9]/_}"
+  local entry name require_fn run_fn fn name_slug
+
+  for entry in "${E2E_AGENTS[@]}"; do
+    IFS='|' read -r name require_fn run_fn <<<"$entry"
+    name_slug="${name//[^A-Za-z0-9]/_}"
+
+    fn="test_${slug}_with_${name_slug}"
+    eval "$fn() {
+      $require_fn
+      new_sample with
+      $run_fn \"\$$prompt_var\"
+      assert grep -q \"\$$expect_var\" \"\$WORK/$target\"
+    }"
+    bats_test_function --description "$layer with apropos ($name): the expected pattern lands" --tags "" -- "$fn"
+
+    fn="test_${slug}_without_${name_slug}"
+    eval "$fn() {
+      $require_fn
+      new_sample without
+      $run_fn \"\$$prompt_var\"
+      refute grep -q \"\$$expect_var\" \"\$WORK/$target\"
+    }"
+    bats_test_function --description "$layer without apropos ($name): the expected pattern does not appear" --tags "" -- "$fn"
+  done
+}
 
 _e2e_dir()    { cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd; }
 _repo_root()  { cd "$(_e2e_dir)/.." && pwd; }
@@ -47,26 +102,27 @@ new_sample() {
     printf '{"hooks":{}}\n' > "$WORK/.claude/settings.json"
     rm -rf "$WORK/.claude/skills"
     rm -f "$WORK/.opencode/plugins/apropos.js"
-    # Remove the sentinel-bearing convention docs themselves, not just the
-    # delivery mechanism. Without this, a sufficiently agentic model (observed
-    # with OpenCode's build agent, which readily runs `cat docs/conventions/...`
-    # on its own initiative after reading AGENTS.md's pointer to that
-    # directory) can discover the sentinel by direct exploration — a path that
-    # has nothing to do with apropos and would falsely fail the without-apropos
-    # control.
+    # Remove the convention docs themselves, not just the delivery mechanism.
+    # Without this, a sufficiently agentic model (observed with OpenCode's
+    # build agent, which readily runs `cat docs/conventions/...` on its own
+    # initiative after reading AGENTS.md's pointer to that directory) can
+    # discover the convention by direct exploration — a path that has nothing
+    # to do with apropos and would falsely fail the without-apropos control.
     rm -f "$WORK/docs/conventions/src-rule.md" \
           "$WORK/docs/conventions/stub-rule.md" \
+          "$WORK/docs/conventions/db-audit-rule.md" \
           "$WORK/docs/conventions/workflows/add-operation.md"
+    # Also remove the supporting module each rule points to (the decorator,
+    # exception, registry, and audit wrapper). Each is a realistic project
+    # convention rather than an arbitrary token, so it's a real, discoverable
+    # code artifact in its own right — leaving it in place would let the same
+    # exploration path above adopt it on its own, independent of apropos.
+    rm -f "$WORK/src/telemetry.py" \
+          "$WORK/scripts/errors.py" \
+          "$WORK/lib/registry.py" \
+          "$WORK/db/audit.py"
   fi
   export WORK
-}
-
-# Hook payloads for the deterministic delivery checks.
-pre_payload() {  # arg: repo-relative file path
-  printf '{"session_id":"det","tool_name":"Edit","cwd":"%s","tool_input":{"file_path":"%s/%s","new_string":"def helper():\\n    return 1\\n"}}' "$WORK" "$WORK" "$1"
-}
-post_payload() {  # arg: repo-relative file path (content raises NotImplementedError)
-  printf '{"session_id":"det","tool_name":"Write","cwd":"%s","tool_input":{"file_path":"%s/%s","content":"def x():\\n    raise NotImplementedError\\n"}}' "$WORK" "$WORK" "$1"
 }
 
 # --- live claude runner -------------------------------------------------------

@@ -6,9 +6,9 @@ exactly the right moment.**
 *Apropos* — apt, pertinent, timely; said or done at exactly the right moment.
 That's the whole design brief: apropos is a single deterministic binary that
 keeps a layered documentation structure working. It compiles convention-doc
-frontmatter into a trigger index, generates skill wrappers, serves as a Claude
-Code hook handler that injects path- and construct-scoped rules at edit time,
-and resolves the conventions that apply to a diff for review.
+frontmatter into a trigger index, generates skill wrappers, serves as a hook
+handler for supported CLI agents that injects path- and construct-scoped rules
+at edit time, and resolves the conventions that apply to a diff for review.
 
 One large always-loaded instruction file gets skimmed and forgotten. apropos
 keeps the guidance small and just-in-time: rules live in
@@ -21,7 +21,7 @@ triggering is deterministic — and ships as a static Linux binary.
 
 - **Claude Code** — PreToolUse/PostToolUse hooks, `AGENTS.md`/`CLAUDE.md`, and generated `SKILL.md` wrappers.
 - **OpenCode** — `tool.execute.before`/`tool.execute.after` plugin hooks, same root file and generated skills.
-- **Gemini CLI**, **Codex**, **Aider**, **GitHub Copilot CLI**, and **Cursor CLI** — coming soon.
+- **Gemini CLI**, **Codex**, **GitHub Copilot CLI**, and **Cursor CLI** — coming soon.
 
 ## Install
 
@@ -50,10 +50,15 @@ apropos lint                # validate the structure
 apropos doctor              # check the environment and hook wiring
 ```
 
-`apropos init` wires two Claude Code hooks into `.claude/settings.json`:
-`apropos hook pre` (PreToolUse → Layer 2, path-scoped) and `apropos hook post`
-(PostToolUse → Layer 3, construct-scoped). You never run these by hand — Claude
-Code calls them, and they inject the matching conventions as context.
+`apropos init` wires hooks for whichever CLI agents are in play. By default it
+auto-detects: if `claude` is on PATH it wires two hooks into
+`.claude/settings.json` (`apropos hook pre` → PreToolUse → Layer 2,
+path-scoped; `apropos hook post` → PostToolUse → Layer 3, construct-scoped);
+if `opencode` is on PATH it generates the OpenCode plugin bridge instead (or
+as well). Pass `--tool claude` / `--tool opencode` (repeatable) to wire
+specific agents explicitly regardless of PATH. You never run the hooks
+themselves by hand — the agent calls them, and they inject the matching
+conventions as context.
 
 Run `apropos help` for the full mental model (also `apropos help --format json` for
 the machine-readable form, or `apropos help <command>`).
@@ -63,6 +68,27 @@ the machine-readable form, or `apropos help <command>`).
 Guidance is organized into four layers, each triggered by the cheapest mechanism
 that reliably fires it — see [`docs/conventions/README.md`](./docs/conventions/README.md)
 for the full model:
+
+```mermaid
+flowchart LR
+    Docs["docs/conventions/*.md\n(rules + YAML frontmatter)"]
+    Docs -->|apropos generate| Index["trigger index +\nskill wrappers"]
+
+    Index --> Pre["PreToolUse hook\napropos hook pre"]
+    Index --> Post["PostToolUse hook\napropos hook post"]
+    Index --> Skill["skill match"]
+    Root["AGENTS.md / CLAUDE.md"] --> L1
+
+    Pre -->|file path| L2["Layer 2 · path-scoped"]
+    Post -->|written content| L3["Layer 3 · construct-scoped"]
+    Skill -->|task intent| L4["Layer 4 · intent skills"]
+    L1["Layer 1 · always loaded"]
+
+    L1 & L2 & L3 & L4 --> Ctx(["context injected\ninto the agent"])
+
+    Diff["git diff"] -->|apropos review| Manifest["review manifest\n(conventions that apply)"]
+    Index --> Manifest
+```
 
 | Layer | For | Trigger | Delivered by |
 | --- | --- | --- | --- |
@@ -76,30 +102,17 @@ trigger index and committed skill wrappers. At edit time, the hooks look up the
 matching rules and inject them. For review, the same frontmatter resolves which
 conventions apply to a diff, so review prompts carry zero copies of the rules.
 
-## Claude Code version requirement
-
-Layer 2 delivery fires on **PreToolUse**, which depends on Claude Code supporting
-`hookSpecificOutput.additionalContext` for that event. This arrived after the
-PostToolUse path, so **older Claude Code releases may not inject Layer 2 context.**
-
-- `apropos doctor` checks the installed `claude --version` and warns if PreToolUse
-  injection may be unavailable.
-- If it is unavailable, Layer 2 delivery **degrades gracefully to PostToolUse**
-  with no loss of correctness — the path is still knowable after the write — so
-  Layer 3 (already PostToolUse) is unaffected. This is a documented fallback, not
-  a failure mode.
-
 ## Commands
 
 | Command | Purpose |
 | --- | --- |
-| `apropos init` | Bootstrap the convention structure into a repo (idempotent; `--force`, `--example`, `--claude-symlink`, `--dry-run`). |
+| `apropos init` | Bootstrap the convention structure into a repo (idempotent; `--tool claude\|opencode` — repeatable, auto-detects by default — plus `--force`, `--example`, `--claude-symlink`, `--dry-run`). |
 | `apropos generate` | Compile frontmatter into the trigger index and skill wrappers. `--check` is the CI drift gate. |
-| `apropos hook pre` / `hook post` | Claude Code hook handlers (Layer 2 / Layer 3). Fail open — never block an edit. |
+| `apropos hook pre` / `hook post` | Hook handlers for the wired CLI agent (Layer 2 / Layer 3). Fail open — never block an edit. |
 | `apropos match <paths>` | Resolve the conventions applying to given files (`--format paths\|json\|full`). |
 | `apropos review [range]` | Resolve conventions for a git diff range as a review manifest (`--format md\|json`). |
 | `apropos lint` | Validate frontmatter, skill descriptions, root-file budget, and generated-artifact freshness (`--strict`). |
-| `apropos doctor` | Check hook wiring, Claude Code version, index freshness, and cache writability. |
+| `apropos doctor` | Check hook wiring, agent version/capability support, index freshness, and cache writability. |
 | `apropos help` | The dual-audience mental model (human and agent), single-sourced with `--format json`. |
 
 Every command takes `--help`, `--repo-root <dir>` (default: walk up to the nearest
