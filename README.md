@@ -91,6 +91,40 @@ run `apropos generate && apropos lint` and fix anything that's flagged.
 
 `apropos init` prints a pointer to this section as a reminder.
 
+### Graduating conventions into tooling
+
+Prose is the *starting* form for a convention, not the final one: once a rule
+is well understood, it should graduate into something that enforces itself —
+a linter rule (existing or custom) or, for rules about producing new files
+rather than restricting existing code, a generator/scaffold. `docs/conventions/`
+calls this out as an incubator; movement only goes one direction, from docs
+into tooling. Periodically point an agent at the existing rules and ask it to
+propose graduations:
+
+```
+Read every file in docs/conventions/ (including docs/conventions/workflows/).
+For each convention, decide whether it's still a genuine judgment call or
+whether it's ready to graduate out of prose:
+
+1. Can an existing linter/formatter already enforce it (a rule that's
+   available but not turned on)? Name the linter and the rule.
+2. Could it be enforced by a new custom lint rule? Describe what the rule
+   would check for.
+3. Is it really about scaffolding new files/boilerplate rather than
+   restricting existing code (e.g. "new operations must register in the
+   dispatch table")? That's a generator candidate, not a lint rule — describe
+   what the generator would emit.
+4. Otherwise, does it genuinely require judgment that tooling can't capture?
+   Leave it as prose.
+
+Treat words like "always", "never", "must", and "must not" as a signal the
+rule is a hard, mechanically-checkable constraint — weigh those docs first.
+
+Don't edit or delete anything yourself. List each convention with your
+recommendation and reasoning so I can review before we implement the lint
+rule or generator and retire the prose it replaces.
+```
+
 ## How it works
 
 Guidance is organized into four layers, each triggered by the cheapest mechanism
