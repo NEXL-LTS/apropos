@@ -23,17 +23,16 @@ die() {
 }
 
 # --- Platform gate -----------------------------------------------------------
-# v1 ships a fully static Linux x86_64 binary only. macOS and Windows are on the
-# roadmap; until their release legs are enabled, build from source.
+# v1 ships fully static Linux x86_64/arm64 binaries only. macOS and Windows are
+# on the roadmap; until their release legs are enabled, build from source.
 os="$(uname -s)"
 arch="$(uname -m)"
-[ "$os" = "Linux" ] || die "unsupported OS '$os'; v1 ships a Linux x86_64 binary only (build from source: make install)."
+[ "$os" = "Linux" ] || die "unsupported OS '$os'; v1 ships Linux binaries only (build from source: make install)."
 case "$arch" in
-  x86_64 | amd64) ;;
-  *) die "unsupported architecture '$arch'; v1 ships x86_64 only (build from source: make install)." ;;
+  x86_64 | amd64) asset="apropos-linux-x86_64" ;;
+  aarch64 | arm64) asset="apropos-linux-arm64" ;;
+  *) die "unsupported architecture '$arch'; v1 ships x86_64/arm64 only (build from source: make install)." ;;
 esac
-
-asset="apropos-linux-x86_64"
 
 # --- Downloader --------------------------------------------------------------
 if command -v curl >/dev/null 2>&1; then
