@@ -1,6 +1,7 @@
 # apropos
 
-**Deliver the right documentation at exactly the right moment.**
+**Context injection for AI CLI coding tools — deliver the right documentation at
+exactly the right moment.**
 
 *Apropos* — apt, pertinent, timely; said or done at exactly the right moment.
 That's the whole design brief: apropos is a single deterministic binary that
@@ -15,6 +16,12 @@ keeps the guidance small and just-in-time: rules live in
 and apropos delivers each one exactly when the file or construct it governs is
 being touched — nothing sooner, nothing later. It makes no LLM calls —
 triggering is deterministic — and ships as a static Linux binary.
+
+## Supported agents
+
+- **Claude Code** — PreToolUse/PostToolUse hooks, `AGENTS.md`/`CLAUDE.md`, and generated `SKILL.md` wrappers.
+- **OpenCode** — `tool.execute.before`/`tool.execute.after` plugin hooks, same root file and generated skills.
+- **Gemini CLI** and **Codex** — coming soon.
 
 ## Install
 
