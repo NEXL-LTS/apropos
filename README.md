@@ -17,11 +17,11 @@ and apropos delivers each one exactly when the file or construct it governs is
 being touched — nothing sooner, nothing later. It makes no LLM calls —
 triggering is deterministic — and ships as a static Linux binary.
 
-## Supported agents
+## Supported CLI agents
 
 - **Claude Code** — PreToolUse/PostToolUse hooks, `AGENTS.md`/`CLAUDE.md`, and generated `SKILL.md` wrappers.
 - **OpenCode** — `tool.execute.before`/`tool.execute.after` plugin hooks, same root file and generated skills.
-- **Gemini CLI** and **Codex** — coming soon.
+- **Gemini CLI**, **Codex**, **Aider**, **GitHub Copilot CLI**, and **Cursor CLI** — coming soon.
 
 ## Install
 
