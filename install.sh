@@ -2,18 +2,18 @@
 # apropos installer — resolves a GitHub release, verifies its checksum, and drops
 # the static binary on your PATH. Curl-pipe friendly:
 #
-#   curl -fsSL https://raw.githubusercontent.com/NEXL-LTS/muninn-rules/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/NEXL-LTS/apropos/main/install.sh | sh
 #
 # Overrides (environment variables):
 #   APROPOS_VERSION   release tag to install (default: latest)
 #   APROPOS_BIN_DIR   install directory      (default: $HOME/.local/bin)
-#   APROPOS_REPO      owner/repo             (default: NEXL-LTS/muninn-rules)
+#   APROPOS_REPO      owner/repo             (default: NEXL-LTS/apropos)
 #
 # Unlike apropos's hook path, an installer must FAIL CLOSED: any error aborts with
 # a non-zero exit and a clear message rather than leaving a half-installed tool.
 set -eu
 
-REPO="${APROPOS_REPO:-NEXL-LTS/muninn-rules}"
+REPO="${APROPOS_REPO:-NEXL-LTS/apropos}"
 VERSION="${APROPOS_VERSION:-latest}"
 BIN_DIR="${APROPOS_BIN_DIR:-$HOME/.local/bin}"
 
