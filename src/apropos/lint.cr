@@ -14,7 +14,6 @@ module Apropos
     extend self
 
     CONVENTIONS_DIR = "docs/conventions"
-    SKILLS_DIR      = ".claude/skills"
     ROOT_FILES      = {"AGENTS.md", "CLAUDE.md"}
 
     # Line budgets: a root file over 150 lines or a skill doc over 500
@@ -126,27 +125,29 @@ module Apropos
         end
 
       findings = [] of Finding
-      wrappers.each do |slug, content|
-        actual = fs.read?(repo_root.join(SKILLS_DIR, slug, "SKILL.md").to_s)
-        if actual.nil?
-          findings << Finding.new(:error, wrapper_display(slug), "missing generated wrapper (run `apropos generate`)")
-        elsif actual != content
-          findings << Finding.new(:error, wrapper_display(slug), "stale generated wrapper (run `apropos generate`)")
+      Skills::ROOTS.each do |root|
+        wrappers.each do |slug, content|
+          actual = fs.read?(repo_root.join(root, slug, "SKILL.md").to_s)
+          if actual.nil?
+            findings << Finding.new(:error, wrapper_display(root, slug), "missing generated wrapper (run `apropos generate`)")
+          elsif actual != content
+            findings << Finding.new(:error, wrapper_display(root, slug), "stale generated wrapper (run `apropos generate`)")
+          end
         end
-      end
 
-      (existing_slugs(repo_root, fs) - wrappers.keys).sort.each do |slug|
-        findings << Finding.new(:error, wrapper_display(slug), "orphaned generated wrapper (run `apropos generate`)")
+        (existing_slugs(repo_root, fs, root) - wrappers.keys).sort.each do |slug|
+          findings << Finding.new(:error, wrapper_display(root, slug), "orphaned generated wrapper (run `apropos generate`)")
+        end
       end
       findings
     end
 
-    private def existing_slugs(repo_root : Path, fs : Filesystem) : Array(String)
-      fs.glob(repo_root.join(SKILLS_DIR), "*/SKILL.md").map { |absolute| Path[absolute].parent.basename }
+    private def existing_slugs(repo_root : Path, fs : Filesystem, root : Path) : Array(String)
+      fs.glob(repo_root.join(root), "*/SKILL.md").map { |absolute| Path[absolute].parent.basename }
     end
 
-    private def wrapper_display(slug : String) : String
-      "#{SKILLS_DIR}/#{slug}/SKILL.md"
+    private def wrapper_display(root : Path, slug : String) : String
+      root.join(slug, "SKILL.md").to_posix.to_s
     end
 
     private def line_count(text : String) : Int32

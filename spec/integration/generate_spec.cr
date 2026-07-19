@@ -43,6 +43,7 @@ describe "apropos generate (binary)" do
         Read `docs/conventions/workflows/ship.md` and follow it.
         SKILL
       File.read(File.join(dir, ".claude/skills/ship/SKILL.md")).should eq(golden)
+      File.read(File.join(dir, ".gemini/skills/ship/SKILL.md")).should eq(golden)
 
       clean = Process.run(binary, ["generate", "--check", "--repo-root", dir], output: IO::Memory.new)
       clean.exit_code.should eq(0)

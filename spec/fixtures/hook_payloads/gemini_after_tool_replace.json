@@ -1,0 +1,17 @@
+{
+  "session_id": "abc123",
+  "transcript_path": "/home/u/.gemini/tmp/x/logs.json",
+  "cwd": "/repo",
+  "hook_event_name": "AfterTool",
+  "timestamp": "2026-07-19T00:00:00Z",
+  "tool_name": "replace",
+  "tool_input": {
+    "file_path": "app/jobs/mailer_job.cr",
+    "instruction": "Rename the retry helper",
+    "old_string": "old body",
+    "new_string": "new"
+  },
+  "tool_response": {
+    "llmContent": "Successfully modified file: app/jobs/mailer_job.cr"
+  }
+}

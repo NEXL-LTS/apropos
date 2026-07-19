@@ -44,6 +44,32 @@ describe "apropos init/lint/doctor/help (binary)" do
     end
   end
 
+  it "bootstraps a repo with --tool gemini and doctor shows the gemini line" do
+    dir = File.tempname("apropos-lifecycle-gemini")
+    begin
+      Dir.mkdir_p(dir)
+
+      code, stdout = run_apropos(binary, ["init", "--tool", "gemini", "--repo-root", dir])
+      code.should eq(0)
+      stdout.should contain(".gemini/settings.json")
+      File.exists?(File.join(dir, ".gemini/settings.json")).should be_true
+      File.exists?(File.join(dir, ".claude/settings.json")).should be_false
+
+      settings = File.read(File.join(dir, ".gemini/settings.json"))
+      settings.should contain("AfterTool")
+      settings.should contain("apropos hook pre")
+      settings.should contain("apropos hook post")
+
+      # `gemini` is genuinely on PATH in this devcontainer (npm-installed), so
+      # doctor's advisory check actually runs rather than skipping — confirming
+      # the wiring `init` just wrote is itself well-formed.
+      _, stdout = run_apropos(binary, ["doctor", "--repo-root", dir])
+      stdout.should contain("gemini:")
+    ensure
+      FileUtils.rm_rf(dir)
+    end
+  end
+
   it "bootstraps a repo and lints it clean" do
     dir = File.tempname("apropos-lifecycle-repo")
     begin

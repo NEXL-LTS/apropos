@@ -1,9 +1,9 @@
 # apropos end-to-end test
 
 A [bats-core](https://github.com/bats-core/bats-core) suite that runs apropos
-against live Claude Code and OpenCode and asserts what the model actually writes.
-It is organized **by layer**; each layer runs the same with-apropos /
-without-apropos contrast for both CLIs.
+against live Claude Code, OpenCode, and Gemini CLI and asserts what the model
+actually writes. It is organized **by layer**; each layer runs the same
+with-apropos / without-apropos contrast for every CLI.
 
 ## Structure
 
@@ -46,19 +46,19 @@ make e2e          # or: bash e2e/run.sh
 ```
 
 **Authenticate with each CLI first.** The live tests need a working, logged-in
-`claude` and `opencode` — see [CI-safety and credentials](#ci-safety-and-credentials)
+`claude`, `opencode`, and `gemini` — see [CI-safety and credentials](#ci-safety-and-credentials)
 below for how. Skip this and the corresponding live tests don't fail; they
 just skip cleanly, which can look like a pass at a glance.
 
 `bats` and its `bats-support`/`bats-assert` libraries ship in the devcontainer
 image (resolved via `BATS_LIB_PATH`), so nothing is fetched at run time.
 Before invoking `bats`, `run.sh` runs `apropos init --tool claude --tool
-opencode` and `apropos generate` against `project/` itself, so its hook
-wiring (`.claude/`, `.opencode/`) is always freshly generated rather than
-committed (see `project/.gitignore`) — that way the fixture is fully wired
-regardless of which agents happen to be installed on the machine running the
-suite. `run.sh` invokes `bats` on [`tests/`](./tests); extra flags pass
-through, e.g. `bash e2e/run.sh --filter 'Layer 2'`.
+opencode --tool gemini` and `apropos generate` against `project/` itself, so
+its hook wiring (`.claude/`, `.opencode/`, `.gemini/`) is always freshly
+generated rather than committed (see `project/.gitignore`) — that way the
+fixture is fully wired regardless of which agents happen to be installed on
+the machine running the suite. `run.sh` invokes `bats` on [`tests/`](./tests);
+extra flags pass through, e.g. `bash e2e/run.sh --filter 'Layer 2'`.
 
 ## The two tests per layer, per agent
 
@@ -80,10 +80,11 @@ actually steered.
 
 ## CI-safety and credentials
 
-The live checks require the `claude` / `opencode` CLI and valid credentials.
-When either is absent or unauthenticated, its tests **skip cleanly** and the run
-still exits `0`; the deterministic checks always run. This is why the e2e is not
-wired into `make check` or CI — it is a local, opt-in confidence check.
+The live checks require the `claude` / `opencode` / `gemini` CLI and valid
+credentials. When one is absent or unauthenticated, its tests **skip
+cleanly** and the run still exits `0`; the deterministic checks always run.
+This is why the e2e is not wired into `make check` or CI — it is a local,
+opt-in confidence check.
 
 In the devcontainer, Claude's credentials arrive via the `${HOME}/.claude.json`
 bind mount. OpenCode's credential lives in a named volume (`opencode-data`), so
@@ -95,10 +96,15 @@ opencode auth login
 
 It then persists across rebuilds. Until you do, the live OpenCode tests skip.
 
+Gemini CLI keeps its OAuth credential under `~/.gemini`, bind-mounted as the
+`gemini-data` volume — run `gemini` once in the container and complete its
+browser OAuth flow on first prompt; it then persists across rebuilds the same
+way. Until you do, the live Gemini tests skip.
+
 ## Options
 
 - `E2E_MODEL=<model>` — pass a specific model to `claude -p --model` /
-  `opencode run --model` (default: each CLI's configured model). Use a small
-  model (e.g. `E2E_MODEL=claude-haiku-4-5`) for cheaper runs.
+  `opencode run --model` / `gemini -p --model` (default: each CLI's configured
+  model). Use a small model (e.g. `E2E_MODEL=claude-haiku-4-5`) for cheaper runs.
 - `bash e2e/run.sh --no-tempdir-cleanup` — keep the per-test temp dirs for
   inspection.

@@ -11,10 +11,18 @@ module Apropos
   # prints what would change and writes nothing.
   #
   # Per-tool hook wiring (Claude Code's `.claude/settings.json`, OpenCode's
-  # generated plugin) is tool-agnostic: pass `--tool claude` / `--tool
-  # opencode` (repeatable) to wire specific agents explicitly, or omit `--tool`
-  # entirely to auto-detect by probing PATH for each supported agent. This
-  # keeps init easy to extend as more agents (Gemini CLI, Codex, ...) land.
+  # generated plugin, Gemini CLI's `.gemini/settings.json`) is tool-agnostic:
+  # pass `--tool claude` / `--tool opencode` / `--tool gemini` (repeatable) to
+  # wire specific agents explicitly, or omit `--tool` entirely to auto-detect
+  # by probing PATH for each supported agent. This keeps init easy to extend as
+  # more agents (Codex, ...) land.
+  #
+  # Gemini CLI's hook system has no pre-edit context-injection event (its
+  # `BeforeTool` output schema only supports overriding tool arguments or
+  # blocking the call — see `merge_gemini_settings`), so both Layer 2 and
+  # Layer 3 are wired onto its `AfterTool` event. Layer 2 still fires, just
+  # after the edit instead of before it — the same timing degradation
+  # `doctor.cr` already documents for older Claude Code versions.
   #
   # init is an authoring command, so it fails **closed**: a malformed existing
   # `settings.json` is an error, not a silent overwrite.
@@ -25,8 +33,12 @@ module Apropos
     end
 
     # CLI agents init knows how to wire hooks for. Extend this set as more
-    # emitters land (Gemini CLI, Codex, GitHub Copilot CLI, Cursor CLI, ...).
-    KNOWN_TOOLS = Set{"claude", "opencode"}
+    # emitters land (Codex, GitHub Copilot CLI, Cursor CLI, ...).
+    KNOWN_TOOLS = Set{"claude", "opencode", "gemini"}
+
+    # The context filename apropos points Gemini CLI at, so Layer 1 reads the
+    # same root file Claude Code and OpenCode do without needing a symlink.
+    GEMINI_CONTEXT_FILENAME = "AGENTS.md"
 
     # Parsed flags for one `init` invocation. `tools: nil` means auto-detect;
     # a non-nil set (from one or more `--tool`) is used verbatim, ignoring PATH.
@@ -58,6 +70,7 @@ module Apropos
       write_examples(repo_root, fs, options, stdout) if options.example
       link_claude(repo_root, fs, options, stdout) if options.claude_symlink
       scaffold_opencode(repo_root, fs, options, stdout) if tools.includes?("opencode")
+      merge_gemini_settings(repo_root, fs, options, stdout) if tools.includes?("gemini")
       stdout.puts NEXT_STEPS_HINT unless options.dry_run
       0
     rescue ex : Apropos::Error
@@ -144,7 +157,7 @@ module Apropos
     # settings object, preserving every other key and hook and adding a group
     # only when apropos's own command is not already wired for that event.
     private def merged_settings(existing : String?) : String
-      root = settings_root(existing)
+      root = settings_root(existing, ".claude/settings.json")
       hooks = (root["hooks"]?.try(&.as_h?)).try(&.dup) || {} of String => JSON::Any
       {"PreToolUse" => "pre", "PostToolUse" => "post"}.each do |event, sub|
         groups = (hooks[event]?.try(&.as_a?)).try(&.dup) || [] of JSON::Any
@@ -155,16 +168,16 @@ module Apropos
       JSON::Any.new(root).to_pretty_json + "\n"
     end
 
-    private def settings_root(existing : String?) : Hash(String, JSON::Any)
+    private def settings_root(existing : String?, label : String) : Hash(String, JSON::Any)
       return {} of String => JSON::Any if existing.nil?
       parsed =
         begin
           JSON.parse(existing)
         rescue ex : JSON::ParseException
-          raise Error.new("existing .claude/settings.json is not valid JSON: #{ex.message}")
+          raise Error.new("existing #{label} is not valid JSON: #{ex.message}")
         end
       hash = parsed.as_h?
-      raise Error.new(".claude/settings.json must be a JSON object") if hash.nil?
+      raise Error.new("#{label} must be a JSON object") if hash.nil?
       hash.dup
     end
 
@@ -213,6 +226,64 @@ module Apropos
       path = repo_root.join(".opencode", "plugins", "apropos.js").to_s
       existing = fs.read?(path)
       sync(fs, options, stdout, path, OPENCODE_PLUGIN_JS, existing, ".opencode/plugins/apropos.js")
+    end
+
+    # Write (or merge into) `.gemini/settings.json`: Gemini CLI's `AfterTool`
+    # event is the only one whose output schema supports injecting text back
+    # into the model's context (`hookSpecificOutput.additionalContext`) — its
+    # `BeforeTool` event can only override tool arguments or block the call.
+    # So both `apropos hook pre` (Layer 2) and `apropos hook post` (Layer 3)
+    # run there, matched on Gemini's file-editing tools (`write_file`,
+    # `replace`); `Hook.pre`'s Layer 2 matching only needs the edited file's
+    # path, which `AfterTool`'s payload still carries, so Layer 2 rules still
+    # fire — just after the edit rather than before it. Also points Gemini's
+    # configurable context filename at `AGENTS.md`, so Layer 1 needs no
+    # symlink the way Claude's CLAUDE.md does.
+    private def merge_gemini_settings(repo_root : Path, fs : Filesystem, options : Options, stdout : IO) : Nil
+      path = repo_root.join(".gemini", "settings.json").to_s
+      existing = fs.read?(path)
+      sync(fs, options, stdout, path, merged_gemini_settings(existing), existing, ".gemini/settings.json")
+    end
+
+    private def merged_gemini_settings(existing : String?) : String
+      root = settings_root(existing, ".gemini/settings.json")
+      hooks = (root["hooks"]?.try(&.as_h?)).try(&.dup) || {} of String => JSON::Any
+      groups = (hooks["AfterTool"]?.try(&.as_a?)).try(&.dup) || [] of JSON::Any
+      groups << gemini_apropos_group unless groups.any? { |group| apropos_group?(group) }
+      hooks["AfterTool"] = JSON::Any.new(groups)
+      root["hooks"] = JSON::Any.new(hooks)
+      root["context"] = merged_gemini_context(root["context"]?)
+      JSON::Any.new(root).to_pretty_json + "\n"
+    end
+
+    # Add `AGENTS.md` to `context.fileName` (creating it as a one-element
+    # array if absent), preserving every other filename a user already listed.
+    private def merged_gemini_context(existing : JSON::Any?) : JSON::Any
+      context = (existing.try(&.as_h?)).try(&.dup) || {} of String => JSON::Any
+      names = context["fileName"]?
+      list = names.try(&.as_a?) || names.try { |name| [name] } || [] of JSON::Any
+      unless list.any? { |name| name.as_s? == GEMINI_CONTEXT_FILENAME }
+        list = list + [JSON::Any.new(GEMINI_CONTEXT_FILENAME)]
+      end
+      context["fileName"] = JSON::Any.new(list)
+      JSON::Any.new(context)
+    end
+
+    private def gemini_apropos_group : JSON::Any
+      pre = JSON::Any.new({
+        "type"    => JSON::Any.new("command"),
+        "command" => JSON::Any.new("apropos hook pre"),
+        "timeout" => JSON::Any.new(10_i64),
+      })
+      post = JSON::Any.new({
+        "type"    => JSON::Any.new("command"),
+        "command" => JSON::Any.new("apropos hook post"),
+        "timeout" => JSON::Any.new(10_i64),
+      })
+      JSON::Any.new({
+        "matcher" => JSON::Any.new("write_file|replace"),
+        "hooks"   => JSON::Any.new([pre, post]),
+      })
     end
 
     # Alias CLAUDE.md → AGENTS.md so the same Layer 1 file serves both loaders.
@@ -274,7 +345,10 @@ module Apropos
       Claude Code delivers Layer 2 via PreToolUse `additionalContext`; run
       `apropos doctor` to verify the version. OpenCode delivers Layer 2 via
       `tool.execute.before` and Layer 3 via `tool.execute.after`, injecting
-      context with `noReply: true` through the generated plugin.
+      context with `noReply: true` through the generated plugin. Gemini CLI has
+      no pre-edit context-injection event, so both Layer 2 and Layer 3 deliver
+      via its `AfterTool` hook instead — Layer 2 still fires, just after the
+      edit rather than before it.
       MD
 
     AGENTS_SKELETON = <<-MD

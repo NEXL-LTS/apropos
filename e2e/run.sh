@@ -3,7 +3,7 @@
 # apropos end-to-end test runner.
 #
 # Runs the layered bats suite in e2e/tests/. It proves, per layer, that apropos
-# delivers its convention and steers a real `claude` run — see e2e/README.md.
+# delivers its convention and steers a real CLI agent run — see e2e/README.md.
 #
 # `bats` and the bats-support/bats-assert libraries are provided by the
 # devcontainer image (.devcontainer/Dockerfile); BATS_LIB_PATH points at them.
@@ -12,8 +12,8 @@
 #   bash e2e/run.sh                        # run the whole suite
 #   bash e2e/run.sh --filter 'Layer 2'     # extra flags pass through to bats
 #
-# Live checks skip cleanly when `claude` is unavailable, so this is safe to run
-# anywhere the image provides bats.
+# Live checks skip cleanly when a given CLI agent is unavailable, so this is
+# safe to run anywhere the image provides bats.
 set -euo pipefail
 
 E2E_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -32,15 +32,15 @@ if ! command -v bats >/dev/null 2>&1; then
   exit 127
 fi
 
-# e2e/project/.claude and .opencode are generated, not committed (see its
-# .gitignore) — regenerate them here so the fixture is always wired for both
-# agents before bats copies it per test, regardless of whether this machine
-# has claude/opencode installed (helpers.bash's require_live_<x> is what
-# decides whether the *live* tests run; the wiring itself must exist either
-# way). `--tool` is used explicitly rather than left to auto-detect for
-# exactly that reason. Both commands are idempotent.
+# e2e/project/.claude, .opencode, and .gemini are generated, not committed
+# (see its .gitignore) — regenerate them here so the fixture is always wired
+# for every agent before bats copies it per test, regardless of whether this
+# machine has claude/opencode/gemini installed (helpers.bash's
+# require_live_<x> is what decides whether the *live* tests run; the wiring
+# itself must exist either way). `--tool` is used explicitly rather than left
+# to auto-detect for exactly that reason. All three commands are idempotent.
 [ -x "$APROPOS_BIN" ] || ( cd "$REPO_ROOT" && make release >/dev/null )
-"$APROPOS_BIN" init --tool claude --tool opencode --repo-root "$E2E_DIR/project" >/dev/null
+"$APROPOS_BIN" init --tool claude --tool opencode --tool gemini --repo-root "$E2E_DIR/project" >/dev/null
 "$APROPOS_BIN" generate --repo-root "$E2E_DIR/project" >/dev/null
 
 exec bats "$@" "$E2E_DIR/tests"

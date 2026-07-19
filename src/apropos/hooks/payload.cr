@@ -2,7 +2,10 @@ require "json"
 
 module Apropos
   module Hook
-    # The Claude Code hook input contract. Parsing is
+    # The hook input contract, shared across every wired CLI agent's own wire
+    # format (Claude Code's PreToolUse/PostToolUse payload; Gemini CLI's
+    # AfterTool payload, whose `write_file`/`replace` tools happen to use the
+    # same `file_path`/`content`/`new_string` argument names). Parsing is
     # deliberately *tolerant*: every field is optional, unknown keys are ignored,
     # and malformed JSON yields nil rather than raising — the hook path must fail
     # open, and the field names are the part of the contract most

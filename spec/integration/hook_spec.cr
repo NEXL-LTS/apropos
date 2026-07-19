@@ -74,4 +74,46 @@ describe "apropos hook (binary)" do
     code.should eq(0)
     output.should be_empty
   end
+
+  # Gemini CLI wires both `hook pre` and `hook post` onto its AfterTool event
+  # (its BeforeTool output schema cannot inject context — see init.cr), and its
+  # write_file/replace tools happen to use the exact argument names Claude's
+  # Write/Edit do. These fixtures are real captures of that shape (see
+  # spec/fixtures/hook_payloads/), proving the binary needs no Gemini-specific
+  # code, not just the injected-IO unit specs.
+  it "handles a Gemini CLI write_file AfterTool payload with no tool-specific code" do
+    dir = File.tempname("apropos-hook-repo")
+    begin
+      Dir.mkdir_p(File.join(dir, "docs/conventions"))
+      File.write(File.join(dir, "docs/conventions/db.md"),
+        "---\ncontents: ['\\btransaction\\b']\n---\n# DB\n\nWrap writes in a transaction.\n")
+
+      payload = File.read("spec/fixtures/hook_payloads/gemini_after_tool_write_file.json")
+        .gsub("db/migrate/001_create.cr", File.join(dir, "db/migrate/001_create.cr"))
+
+      code, output = run_hook(binary, ["hook", "post", "--repo-root", dir], payload)
+      code.should eq(0)
+      output.should contain("Wrap writes in a transaction.")
+    ensure
+      FileUtils.rm_rf(dir)
+    end
+  end
+
+  it "handles a Gemini CLI replace AfterTool payload with no tool-specific code" do
+    dir = File.tempname("apropos-hook-repo")
+    begin
+      Dir.mkdir_p(File.join(dir, "docs/conventions"))
+      File.write(File.join(dir, "docs/conventions/jobs.md"),
+        "---\npaths: [\"app/jobs/**\"]\n---\n# Jobs\n\nKeep jobs idempotent.\n")
+
+      payload = File.read("spec/fixtures/hook_payloads/gemini_after_tool_replace.json")
+        .gsub("app/jobs/mailer_job.cr", File.join(dir, "app/jobs/mailer_job.cr"))
+
+      code, output = run_hook(binary, ["hook", "pre", "--repo-root", dir], payload)
+      code.should eq(0)
+      output.should contain("Keep jobs idempotent.")
+    ensure
+      FileUtils.rm_rf(dir)
+    end
+  end
 end

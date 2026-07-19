@@ -18,6 +18,7 @@
 E2E_AGENTS=(
   "Claude|require_live_claude|run_claude"
   "OpenCode|require_live_opencode|run_opencode"
+  "Gemini|require_live_gemini|run_gemini"
 )
 
 # Register the live with/without pair of tests for one layer, once per agent
@@ -102,6 +103,8 @@ new_sample() {
     printf '{"hooks":{}}\n' > "$WORK/.claude/settings.json"
     rm -rf "$WORK/.claude/skills"
     rm -f "$WORK/.opencode/plugins/apropos.js"
+    printf '{"hooks":{}}\n' > "$WORK/.gemini/settings.json"
+    rm -rf "$WORK/.gemini/skills"
     # Remove the convention docs themselves, not just the delivery mechanism.
     # Without this, a sufficiently agentic model (observed with OpenCode's
     # build agent, which readily runs `cat docs/conventions/...` on its own
@@ -128,6 +131,7 @@ new_sample() {
 # --- live claude runner -------------------------------------------------------
 claude_ready() { command -v claude >/dev/null 2>&1; }
 opencode_ready() { command -v opencode >/dev/null 2>&1; }
+gemini_ready() { command -v gemini >/dev/null 2>&1; }
 
 # Echo the exact live command a runner is about to execute, so it can be copied
 # and run by hand to reproduce a failure.
@@ -234,5 +238,50 @@ run_opencode() {  # arg: prompt
   if [ "$rc" -ne 0 ]; then
     touch "$BATS_RUN_TMPDIR/opencode_unusable"
     skip "opencode exited $rc"
+  fi
+}
+
+# --- live gemini runner --------------------------------------------------------
+
+# Skip unless a real, authenticated gemini is available. Uses a run-wide
+# unusable flag so that once gemini is found unusable, later live tests skip
+# immediately instead of each paying for a failed call.
+require_live_gemini() {
+  gemini_ready || skip "gemini not on PATH"
+  [ -f "$BATS_RUN_TMPDIR/gemini_unusable" ] && skip "gemini unusable (detected earlier)"
+  if [ ! -f "$BATS_RUN_TMPDIR/gemini_auth_ok" ]; then
+    local rc=0
+    echo_cmd "gemini -p \"reply with the single word READY\" --approval-mode yolo"
+    timeout 30 gemini -p "reply with the single word READY" --approval-mode yolo \
+      >/dev/null 2>/dev/null || rc=$?
+    if [ "$rc" -ne 0 ]; then
+      touch "$BATS_RUN_TMPDIR/gemini_unusable"
+      skip "gemini not authenticated (exit $rc)"
+    fi
+    touch "$BATS_RUN_TMPDIR/gemini_auth_ok"
+  fi
+  return 0
+}
+
+# Run gemini non-interactively in $WORK. .gemini/settings.json's AfterTool
+# hooks bridge the calls into `apropos hook pre`/`apropos hook post`; apropos
+# must be on PATH. --approval-mode yolo auto-approves file edits so a headless
+# run doesn't hang on a confirmation prompt. Plain-text output only (not
+# --output-format json): Gemini CLI has a known issue where JSON output mode
+# exits early on a non-fatal tool error, and success here only ever depends on
+# the exit code, never on parsing structured output. Stdout is written to
+# $WORK/_gm_out.txt; per Gemini's documented headless exit codes (0 success,
+# nonzero otherwise), any nonzero exit skips the test.
+run_gemini() {  # arg: prompt
+  local model_args=()
+  [ -n "${E2E_MODEL:-}" ] && model_args=(--model "$E2E_MODEL")
+  local rc=0
+  echo_cmd "cd $WORK && gemini -p \"$1\" --approval-mode yolo ${model_args[*]}"
+  (
+    cd "$WORK" && gemini -p "$1" --approval-mode yolo "${model_args[@]}"
+  ) >"$WORK/_gm_out.txt" 2>"$WORK/_gm_err.txt" || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    touch "$BATS_RUN_TMPDIR/gemini_unusable"
+    skip "gemini exited $rc"
   fi
 }

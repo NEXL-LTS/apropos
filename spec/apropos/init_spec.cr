@@ -1,11 +1,12 @@
 require "../spec_helper"
 
-private ROOT          = Path["/repo"]
-private README_PATH   = "/repo/docs/conventions/README.md"
-private AGENTS_PATH   = "/repo/AGENTS.md"
-private SETTINGS_PATH = "/repo/.claude/settings.json"
-private GITIGNORE     = "/repo/.gitignore"
-private PLUGIN_PATH   = "/repo/.opencode/plugins/apropos.js"
+private ROOT                 = Path["/repo"]
+private README_PATH          = "/repo/docs/conventions/README.md"
+private AGENTS_PATH          = "/repo/AGENTS.md"
+private SETTINGS_PATH        = "/repo/.claude/settings.json"
+private GITIGNORE            = "/repo/.gitignore"
+private PLUGIN_PATH          = "/repo/.opencode/plugins/apropos.js"
+private GEMINI_SETTINGS_PATH = "/repo/.gemini/settings.json"
 
 # A configurable Environment double: `present` is the set of CLI agent
 # binaries that resolve on PATH, used to exercise auto-detection.
@@ -263,6 +264,77 @@ describe Apropos::Init do
       fs.files.has_key?(SETTINGS_PATH).should be_false
       fs.files.has_key?(PLUGIN_PATH).should be_false
       stdout.should contain("no supported CLI agent found on PATH")
+    end
+  end
+
+  describe "gemini settings.json merge" do
+    it "writes AfterTool hooks and context.fileName" do
+      fs = InMemoryFS.new
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      content = fs.files[GEMINI_SETTINGS_PATH]
+      content.should contain("AfterTool")
+      content.should contain("apropos hook pre")
+      content.should contain("apropos hook post")
+      content.should contain("write_file|replace")
+      content.should contain(%("fileName"))
+      content.should contain("AGENTS.md")
+    end
+
+    it "does not wire BeforeTool — Gemini's BeforeTool cannot inject context" do
+      fs = InMemoryFS.new
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      fs.files[GEMINI_SETTINGS_PATH].should_not contain("BeforeTool")
+    end
+
+    it "is idempotent — re-running reports current and does not duplicate the group" do
+      fs = InMemoryFS.new
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      before = fs.files[GEMINI_SETTINGS_PATH]
+
+      _, stdout, _ = run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      stdout.should contain("current  .gemini/settings.json")
+      fs.files[GEMINI_SETTINGS_PATH].should eq(before)
+      fs.files[GEMINI_SETTINGS_PATH].scan("apropos hook pre").size.should eq(1)
+    end
+
+    it "preserves foreign keys and an existing fileName list" do
+      seed = %({"model": "gemini-pro", "context": {"fileName": ["CONTEXT.md"]}})
+      fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      merged = fs.files[GEMINI_SETTINGS_PATH]
+      merged.should contain(%("model": "gemini-pro"))
+      merged.should contain("CONTEXT.md")
+      merged.should contain("AGENTS.md")
+    end
+
+    it "does not duplicate AGENTS.md when it is already listed" do
+      seed = %({"context": {"fileName": ["AGENTS.md"]}})
+      fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      fs.files[GEMINI_SETTINGS_PATH].scan("AGENTS.md").size.should eq(1)
+    end
+
+    it "upgrades a single fileName string to an array rather than clobbering it" do
+      seed = %({"context": {"fileName": "CONTEXT.md"}})
+      fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      merged = fs.files[GEMINI_SETTINGS_PATH]
+      merged.should contain("CONTEXT.md")
+      merged.should contain("AGENTS.md")
+    end
+
+    it "fails closed on malformed existing gemini settings JSON" do
+      fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => "{not json"})
+      code, _, stderr = run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      code.should eq(1)
+      stderr.should contain("not valid JSON")
+    end
+
+    it "auto-detects gemini on PATH" do
+      fs = InMemoryFS.new
+      _, stdout, _ = run_init(fs, Apropos::Init::Options.new, FakeEnv.new(Set{"gemini"}))
+      fs.files.has_key?(GEMINI_SETTINGS_PATH).should be_true
+      stdout.should contain("detected gemini")
     end
   end
 
