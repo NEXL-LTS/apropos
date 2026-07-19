@@ -1,0 +1,31 @@
+name: zizmor 🌈
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# No token needed by default: zizmor's offline audits plus the API token
+# GitHub grants each job are enough. Keep the workflow itself least-privileged.
+permissions: {}
+
+jobs:
+  zizmor:
+    name: Run zizmor 🌈
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # needed to clone the repo (private/internal repos)
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      # advanced-security: false makes the action print findings and fail the
+      # job on any finding, rather than uploading SARIF to GitHub Advanced
+      # Security. This gives a portable, blocking pass/fail check without
+      # requiring security-events: write or an Advanced Security license.
+      - name: Run zizmor 🌈
+        uses: zizmorcore/zizmor-action@6599ee8b7a49aef6a770f63d261d214911a7ce02 # v0.6.0
+        with:
+          advanced-security: false
