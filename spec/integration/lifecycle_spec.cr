@@ -26,12 +26,12 @@ describe "apropos init/lint/doctor/help (binary)" do
     File.delete?(binary)
   end
 
-  it "bootstraps a repo with --opencode and doctor shows opencode line" do
+  it "bootstraps a repo with --tool opencode --tool claude and doctor shows opencode line" do
     dir = File.tempname("apropos-lifecycle-opencode")
     begin
       Dir.mkdir_p(dir)
 
-      code, stdout = run_apropos(binary, ["init", "--opencode", "--repo-root", dir])
+      code, stdout = run_apropos(binary, ["init", "--tool", "opencode", "--tool", "claude", "--repo-root", dir])
       code.should eq(0)
       stdout.should contain(".opencode/plugins/apropos.js")
       File.exists?(File.join(dir, ".opencode/plugins/apropos.js")).should be_true
@@ -49,7 +49,7 @@ describe "apropos init/lint/doctor/help (binary)" do
     begin
       Dir.mkdir_p(dir)
 
-      code, stdout = run_apropos(binary, ["init", "--example", "--repo-root", dir])
+      code, stdout = run_apropos(binary, ["init", "--example", "--tool", "claude", "--repo-root", dir])
       code.should eq(0)
       stdout.should contain("created  .claude/settings.json")
       File.exists?(File.join(dir, "docs/conventions/README.md")).should be_true

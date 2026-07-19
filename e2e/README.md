@@ -9,24 +9,35 @@ without-apropos contrast for both CLIs.
 
 ```
 tests/
-  helpers.bash  # sample scaffolding, apropos-on-PATH, claude/opencode runners
-  layer2.bats   # path-scoped (src/**) — 3 Claude + 3 OpenCode tests
-  layer3.bats   # construct-scoped (NotImplementedError) — 3 Claude + 3 OpenCode tests
-  layer4.bats   # intent skill (.claude/skills/) — 3 Claude + 3 OpenCode tests
+  helpers.bash  # sample scaffolding, apropos-on-PATH, agent registry, live runners
+  layers.bats   # all layers, each grouped with its expected artifact/prompt/target
 ```
 
-[`project/`](./project) is a self-contained sample codebase with a convention
-document on every layer, each carrying a unique **sentinel token**. A sentinel
-is arbitrary, so the model can only emit it when apropos delivered that
-convention — making it a reliable signal despite LLM nondeterminism. The layers
-sit on non-overlapping paths so each sentinel is attributable to exactly one
-convention.
+`layers.bats` holds every layer's expected artifact, prompt, target file, and
+the `register_live_tests` call that generates its tests — grouped together so
+a layer's full intent reads in one place instead of hopping between files.
+Each layer registers a with/without pair of live tests **per CLI agent** in
+`E2E_AGENTS` (`helpers.bash`); adding a new CLI agent means adding one entry
+to that registry plus a `require_live_<x>`/`run_<x>` helper pair, not a new
+per-layer test.
 
-| Layer | Trigger | Sentinel | Target file |
-| --- | --- | --- | --- |
-| 2 Path-scoped | editing `src/**` | `apropos-rule:L2-7Q2X` | `src/util.py` |
-| 3 Construct-scoped | `NotImplementedError` | `apropos-rule:L3-K9F4` | `scripts/jobs.py` |
-| 4 Intent skill | "add an arithmetic operation" | `apropos-rule:L4-Q7X2` | `lib/calc.py` |
+[`project/`](./project) is a self-contained sample codebase with a convention
+document on every layer. Each convention is a realistic project rule — a
+tracing decorator, a custom exception, a registry call, an audit wrapper —
+naming a specific module/symbol that only exists because the rule said so. A
+model can't produce it by chance, but unlike an arbitrary marker token it's
+not inert either: a pass proves the convention's *behavior* landed, not just
+that a string got copied. The layers sit on non-overlapping paths so each
+expected artifact is attributable to exactly one convention, and the module
+each rule points to is stripped in the without-apropos control (alongside the
+rule doc itself) so there's nothing to discover by exploring the repo.
+
+| Layer | Trigger | Convention | Expected artifact | Target file |
+| --- | --- | --- | --- | --- |
+| 2 Path-scoped | editing `src/**` | new functions wrapped in `@trace_call` | `@trace_call` | `src/util.py` |
+| 3 Construct-scoped | writing `NotImplementedError` | stubs raise `StubNotImplemented` instead | `StubNotImplemented(` | `scripts/jobs.py` |
+| 3 Path+content (AND) | editing `db/**` AND writing `conn.execute(` | queries go through the audit wrapper | `audited_query(` | `db/queries.py` |
+| 4 Intent skill | "add an arithmetic operation" | new ops register in the dispatch table | `register_operation(` | `lib/calc.py` |
 
 ## Running
 
@@ -39,19 +50,23 @@ image (resolved via `BATS_LIB_PATH`), so nothing is fetched at run time.
 `run.sh` invokes `bats` on [`tests/`](./tests); extra flags pass through, e.g.
 `bash e2e/run.sh --filter 'Layer 2'`.
 
-## The three tests per layer
+## The two tests per layer, per agent
 
 Each test copies the sample into an isolated temp git repo (bats'
 `BATS_TEST_TMPDIR`, outside this repo) with a freshly built `apropos` on PATH.
-For each layer, both Claude Code and OpenCode run the same three tests:
+For each layer, every agent in `E2E_AGENTS` runs the same live pair:
 
-1. **delivery (deterministic, no LLM, no network).** Pipe a real hook payload
-   into `apropos hook pre`/`post` and assert the rule + sentinel come back (or,
-   for L4, that the skill wrapper and source doc exist). Always runs.
-2. **with apropos (live).** Run the CLI against the wired sample and assert the
-   sentinel lands in the edited file.
-3. **without apropos (live control).** Run the same prompt with apropos removed
-   and assert the sentinel does **not** appear.
+1. **with apropos (live).** Run the CLI against the wired sample and assert the
+   expected artifact lands in the edited file.
+2. **without apropos (live control).** Run the same prompt with apropos removed
+   and assert the expected artifact does **not** appear.
+
+Deterministic delivery — that a hook payload maps to the right rule, or that
+`generate` writes the right skill wrapper — is covered by the Crystal spec
+suite (`spec/apropos/hook_spec.cr`, `spec/integration/hook_spec.cr`,
+`spec/apropos/generate_spec.cr`, `spec/integration/generate_spec.cr`), not
+here. This suite only exists to prove a real CLI agent's own output is
+actually steered.
 
 ## CI-safety and credentials
 

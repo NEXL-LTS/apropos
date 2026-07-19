@@ -153,7 +153,7 @@ describe Apropos::Doctor do
     it "warns when opencode is on PATH but the plugin is absent" do
       env = FakeEnv.new(present: {"opencode" => "/usr/bin/opencode"})
       _, stdout = run_doctor(InMemoryFS.new, env)
-      stdout.should contain("warn  opencode: plugin absent; run `apropos init --opencode`")
+      stdout.should contain("warn  opencode: plugin absent; run `apropos init --tool opencode`")
     end
 
     it "is ok when opencode is on PATH and the plugin is present" do

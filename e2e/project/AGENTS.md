@@ -2,13 +2,15 @@
 
 A tiny sample codebase for apropos's end-to-end test. It exists so a real Claude
 Code run can be observed picking up scoped conventions that apropos injects at
-edit time — one convention per layer of the standard.
+edit time — one convention per layer of the standard, plus a combined
+path+content example.
 
 ## Layout
 
 - `lib/calc.py` — the arithmetic library (Layer 4 skill target).
 - `src/` — governed source (Layer 2 path-scoped rule).
-- `scripts/` — helper scripts.
+- `scripts/` — background jobs (Layer 3 construct-scoped rule).
+- `db/` — data-access layer (Layer 3 path+content rule).
 
 ## Commands
 

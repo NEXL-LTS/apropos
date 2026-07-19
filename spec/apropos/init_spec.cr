@@ -5,12 +5,31 @@ private README_PATH   = "/repo/docs/conventions/README.md"
 private AGENTS_PATH   = "/repo/AGENTS.md"
 private SETTINGS_PATH = "/repo/.claude/settings.json"
 private GITIGNORE     = "/repo/.gitignore"
+private PLUGIN_PATH   = "/repo/.opencode/plugins/apropos.js"
 
+# A configurable Environment double: `present` is the set of CLI agent
+# binaries that resolve on PATH, used to exercise auto-detection.
+private class FakeEnv < Apropos::Environment
+  def initialize(@present : Set(String) = Set(String).new)
+  end
+
+  def which(command : String) : String?
+    @present.includes?(command) ? "/usr/bin/#{command}" : nil
+  end
+
+  def run_capture(command : String, args : Array(String)) : String?
+    nil
+  end
+end
+
+# Defaults to both supported agents present on PATH, so examples that are not
+# about tool selection itself keep exercising the full scaffold.
 private def run_init(fs : Apropos::Filesystem,
-                     options : Apropos::Init::Options = Apropos::Init::Options.new) : {Int32, String, String}
+                     options : Apropos::Init::Options = Apropos::Init::Options.new,
+                     env : Apropos::Environment = FakeEnv.new(Set{"claude", "opencode"})) : {Int32, String, String}
   stdout = IO::Memory.new
   stderr = IO::Memory.new
-  code = Apropos::Init.run(ROOT, fs, options, stdout, stderr)
+  code = Apropos::Init.run(ROOT, fs, env, options, stdout, stderr)
   {code, stdout.to_s, stderr.to_s}
 end
 
@@ -157,13 +176,14 @@ describe Apropos::Init do
     end
   end
 
-  describe "--opencode" do
-    it "creates the OpenCode plugin when --opencode is given" do
+  describe "--tool (explicit selection)" do
+    it "wires only the explicitly named tool, ignoring what else is on PATH" do
       fs = InMemoryFS.new
-      code, stdout, stderr = run_init(fs, Apropos::Init::Options.new(opencode: true))
+      code, stdout, stderr = run_init(fs, Apropos::Init::Options.new(tools: Set{"opencode"}))
       code.should eq(0)
       stderr.should be_empty
-      plugin = fs.files["/repo/.opencode/plugins/apropos.js"]
+      fs.files.has_key?(SETTINGS_PATH).should be_false
+      plugin = fs.files[PLUGIN_PATH]
       plugin.should contain("tool.execute.before")
       plugin.should contain("tool.execute.after")
       plugin.should contain("noReply: true")
@@ -175,33 +195,67 @@ describe Apropos::Init do
       stdout.should contain(".opencode/plugins/apropos.js")
     end
 
-    it "does not create the OpenCode plugin without --opencode" do
+    it "wires every named tool when --tool is repeated, regardless of PATH" do
       fs = InMemoryFS.new
-      run_init(fs)
-      fs.files.has_key?("/repo/.opencode/plugins/apropos.js").should be_false
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"claude", "opencode"}), FakeEnv.new)
+      fs.files.has_key?(SETTINGS_PATH).should be_true
+      fs.files.has_key?(PLUGIN_PATH).should be_true
     end
 
-    it "is idempotent — re-running with --opencode reports current" do
+    it "does not narrate detection — an explicit selection is the user's own words" do
       fs = InMemoryFS.new
-      run_init(fs, Apropos::Init::Options.new(opencode: true))
-      plugin_before = fs.files["/repo/.opencode/plugins/apropos.js"]
-      _, stdout, _ = run_init(fs, Apropos::Init::Options.new(opencode: true))
+      _, stdout, _ = run_init(fs, Apropos::Init::Options.new(tools: Set{"claude"}))
+      stdout.should_not contain("detected")
+    end
+
+    it "is idempotent — re-running reports current" do
+      fs = InMemoryFS.new
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"opencode"}))
+      plugin_before = fs.files[PLUGIN_PATH]
+      _, stdout, _ = run_init(fs, Apropos::Init::Options.new(tools: Set{"opencode"}))
       stdout.should contain("current  .opencode/plugins/apropos.js")
-      fs.files["/repo/.opencode/plugins/apropos.js"].should eq(plugin_before)
+      fs.files[PLUGIN_PATH].should eq(plugin_before)
     end
 
     it "reports would-create under --dry-run without writing" do
       fs = InMemoryFS.new
-      _, stdout, _ = run_init(fs, Apropos::Init::Options.new(opencode: true, dry_run: true))
+      _, stdout, _ = run_init(fs, Apropos::Init::Options.new(tools: Set{"opencode"}, dry_run: true))
       stdout.should contain("would create .opencode/plugins/apropos.js")
-      fs.files.has_key?("/repo/.opencode/plugins/apropos.js").should be_false
+      fs.files.has_key?(PLUGIN_PATH).should be_false
+    end
+  end
+
+  describe "auto-detection (no --tool given)" do
+    it "wires only Claude when only claude is on PATH" do
+      fs = InMemoryFS.new
+      _, stdout, _ = run_init(fs, Apropos::Init::Options.new, FakeEnv.new(Set{"claude"}))
+      fs.files.has_key?(SETTINGS_PATH).should be_true
+      fs.files.has_key?(PLUGIN_PATH).should be_false
+      stdout.should contain("detected claude")
     end
 
-    it "scaffolds both Claude and OpenCode artefacts simultaneously" do
+    it "wires only OpenCode when only opencode is on PATH" do
       fs = InMemoryFS.new
-      run_init(fs, Apropos::Init::Options.new(opencode: true))
-      fs.files.has_key?("/repo/.claude/settings.json").should be_true
-      fs.files.has_key?("/repo/.opencode/plugins/apropos.js").should be_true
+      _, stdout, _ = run_init(fs, Apropos::Init::Options.new, FakeEnv.new(Set{"opencode"}))
+      fs.files.has_key?(SETTINGS_PATH).should be_false
+      fs.files.has_key?(PLUGIN_PATH).should be_true
+      stdout.should contain("detected opencode")
+    end
+
+    it "wires both when both are on PATH" do
+      fs = InMemoryFS.new
+      _, stdout, _ = run_init(fs, Apropos::Init::Options.new, FakeEnv.new(Set{"claude", "opencode"}))
+      fs.files.has_key?(SETTINGS_PATH).should be_true
+      fs.files.has_key?(PLUGIN_PATH).should be_true
+      stdout.should contain("detected claude, opencode")
+    end
+
+    it "wires neither and says so when no supported agent is on PATH" do
+      fs = InMemoryFS.new
+      _, stdout, _ = run_init(fs, Apropos::Init::Options.new, FakeEnv.new)
+      fs.files.has_key?(SETTINGS_PATH).should be_false
+      fs.files.has_key?(PLUGIN_PATH).should be_false
+      stdout.should contain("no supported CLI agent found on PATH")
     end
   end
 

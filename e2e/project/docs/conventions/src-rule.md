@@ -1,21 +1,27 @@
 ---
 paths: ["src/**"]
 ---
-# Source marker (Layer 2 — path-scoped)
+# Tracing on the public surface (Layer 2 — path-scoped)
 
-**Rule:** Every new function you add under `src/` MUST be immediately preceded,
-on its own line directly above the `def`, by this exact marker comment:
+**Rule:** `src/` is this project's public surface. Every new function added
+under `src/` must be wrapped in the `@trace_call` decorator (imported from
+`src/telemetry.py`), placed directly above the `def` line:
 
 ```python
-# apropos-rule:L2-7Q2X
+from src.telemetry import trace_call
+
+
+@trace_call
+def new_function(...):
+    ...
 ```
 
-**Why:** This project audits which functions in `src/` were written under
-governance. The token `L2-7Q2X` is a build-traceable tag a reviewer greps for;
-omitting it fails review. Delivery is path-scoped, so it arrives whenever a file
-under `src/` is edited — regardless of what the code does.
+**Why:** All public entry points emit tracing spans so calls show up in the
+dashboard. `shout()` predates this requirement and hasn't been migrated —
+new code must comply going forward. Delivery is path-scoped, so it arrives
+whenever a file under `src/` is edited, regardless of what the new code does.
 
 ## Verify
 
-- Each newly added function in `src/` has `# apropos-rule:L2-7Q2X` on the line
-  immediately above its `def`.
+- The new function is preceded by `@trace_call`, and the file imports it from
+  `src/telemetry.py`.

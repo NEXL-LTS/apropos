@@ -340,11 +340,11 @@ describe Apropos::CLI do
   end
 
   describe "init" do
-    it "scaffolds a repo against an explicit --repo-root" do
+    it "scaffolds a repo against an explicit --repo-root, wiring the explicitly named tool" do
       dir = File.tempname("apropos-cli-init")
       begin
         Dir.mkdir_p(dir)
-        code, out, err = run(["init", "--repo-root", dir])
+        code, out, err = run(["init", "--tool", "claude", "--repo-root", dir])
         code.should eq(0)
         err.should be_empty
         out.should contain("docs/conventions/README.md")
@@ -368,11 +368,11 @@ describe Apropos::CLI do
       end
     end
 
-    it "scaffolds the OpenCode plugin with --opencode" do
-      dir = File.tempname("apropos-cli-init-opencode")
+    it "scaffolds every tool named across repeated --tool flags" do
+      dir = File.tempname("apropos-cli-init-tool")
       begin
         Dir.mkdir_p(dir)
-        code, out, err = run(["init", "--opencode", "--repo-root", dir])
+        code, out, err = run(["init", "--tool", "opencode", "--tool", "claude", "--repo-root", dir])
         code.should eq(0)
         err.should be_empty
         out.should contain(".opencode/plugins/apropos.js")
@@ -383,10 +383,36 @@ describe Apropos::CLI do
       end
     end
 
+    it "wires only the one tool named, not the other" do
+      dir = File.tempname("apropos-cli-init-tool-single")
+      begin
+        Dir.mkdir_p(dir)
+        code, _, err = run(["init", "--tool", "opencode", "--repo-root", dir])
+        code.should eq(0)
+        err.should be_empty
+        File.exists?(File.join(dir, ".opencode/plugins/apropos.js")).should be_true
+        File.exists?(File.join(dir, ".claude/settings.json")).should be_false
+      ensure
+        FileUtils.rm_rf(dir)
+      end
+    end
+
     it "rejects --repo-root without a value" do
       code, _, err = run(["init", "--repo-root"])
       code.should eq(1)
       err.should contain("--repo-root requires a directory")
+    end
+
+    it "rejects --tool without a value" do
+      code, _, err = run(["init", "--tool"])
+      code.should eq(1)
+      err.should contain("--tool requires a value")
+    end
+
+    it "rejects an unknown --tool value" do
+      code, _, err = run(["init", "--tool", "gemini"])
+      code.should eq(1)
+      err.should contain("unknown tool 'gemini'")
     end
 
     it "rejects an unknown option" do
