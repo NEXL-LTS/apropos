@@ -43,28 +43,13 @@ make install          # builds the release binary into $PREFIX/bin (default ~/.l
 
 ### Pinning a version in another repo's Dockerfile
 
-Fetch `install.sh` itself from the tagged ref (not `main`) so the installer
-script and the binary version can never drift apart, and install straight
-into `/usr/local/bin` — it's already on `PATH` in virtually every base image,
-unlike the default `$HOME/.local/bin`, which non-interactive `RUN` layers
-never add to `PATH` (that happens in a shell profile only an interactive shell
-sources):
-
 ```dockerfile
 ARG APROPOS_VERSION=v0.1.1
 
-RUN curl -fsSL "https://raw.githubusercontent.com/NEXL-LTS/apropos/${APROPOS_VERSION}/install.sh" \
-      | APROPOS_VERSION=${APROPOS_VERSION} APROPOS_BIN_DIR=/usr/local/bin sh
-```
+RUN curl -fsSL "https://raw.githubusercontent.com/NEXL-LTS/apropos/${APROPOS_VERSION}/install.sh" -o /tmp/install.sh \
+    && APROPOS_VERSION=${APROPOS_VERSION} APROPOS_BIN_DIR=/usr/local/bin sh /tmp/install.sh \
+    && rm /tmp/install.sh
 
-The script detects the build's CPU architecture itself (`uname -m`) and
-downloads `apropos-linux-x86_64` or `apropos-linux-arm64` accordingly, so the
-same Dockerfile line works unmodified for `docker buildx build --platform
-linux/amd64` and `linux/arm64`. It also fails the build (non-zero exit) if
-the downloaded binary can't execute, checksum verification fails, or the
-architecture is unsupported — never a silent no-op. Confirm it landed with:
-
-```dockerfile
 RUN apropos --version
 ```
 
