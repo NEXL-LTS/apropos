@@ -51,7 +51,7 @@ never add to `PATH` (that happens in a shell profile only an interactive shell
 sources):
 
 ```dockerfile
-ARG APROPOS_VERSION=v0.1.0
+ARG APROPOS_VERSION=v0.1.1
 
 RUN curl -fsSL "https://raw.githubusercontent.com/NEXL-LTS/apropos/${APROPOS_VERSION}/install.sh" \
       | APROPOS_BIN_DIR=/usr/local/bin sh
