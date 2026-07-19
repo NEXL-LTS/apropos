@@ -43,6 +43,12 @@ module Apropos
 
     CACHE_IGNORE_ENTRY = ".cache/apropos/"
 
+    # Printed once per run to point at the bootstrapping prompt — most repos
+    # arrive with docs already scattered across READMEs/wikis/comments, and an
+    # agent can sort those into layers faster than a human writing from scratch.
+    NEXT_STEPS_HINT = "next     have your agent bootstrap docs/conventions/ from your existing " \
+                      "docs — see README.md#bootstrapping-from-an-existing-codebase"
+
     def run(repo_root : Path, fs : Filesystem, env : Environment, options : Options, stdout : IO, stderr : IO) : Int32
       tools = resolve_tools(env, options.tools)
       report_tools(stdout, options.tools, tools)
@@ -52,6 +58,7 @@ module Apropos
       write_examples(repo_root, fs, options, stdout) if options.example
       link_claude(repo_root, fs, options, stdout) if options.claude_symlink
       scaffold_opencode(repo_root, fs, options, stdout) if tools.includes?("opencode")
+      stdout.puts NEXT_STEPS_HINT
       0
     rescue ex : Apropos::Error
       stderr.puts "apropos init: #{ex.message}"

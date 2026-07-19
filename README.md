@@ -63,6 +63,34 @@ conventions as context.
 Run `apropos help` for the full mental model (also `apropos help --format json` for
 the machine-readable form, or `apropos help <command>`).
 
+## Bootstrapping from an existing codebase
+
+Most repos aren't starting from zero — the conventions already exist, just
+scattered across a README, a wiki, ADRs, or tribal knowledge in someone's
+head. Rather than writing `docs/conventions/` from scratch, have your coding
+agent survey what's already there and sort it into the four layers. After
+`apropos init`, hand it a prompt along these lines:
+
+```
+Read docs/conventions/README.md to learn apropos's four-layer convention
+model (root file, path-scoped, construct-scoped, intent skills). Then survey
+this repo's existing documentation — README, wiki exports, ADRs, code
+comments — plus any patterns you can infer from the code itself.
+
+For each distinct convention you find, classify it into exactly one layer
+(see "Classifying an instruction" in that doc) and draft it as a new file
+under docs/conventions/ (or docs/conventions/workflows/ for Layer 4 skills)
+with the right YAML frontmatter, stating what the rule is, why it exists,
+and a verification criterion. Only add to AGENTS.md if the convention is
+truly universal.
+
+Don't invent conventions that aren't actually followed here — only capture
+what's real. List every file you created or changed so I can review it, then
+run `apropos generate && apropos lint` and fix anything that's flagged.
+```
+
+`apropos init` prints a pointer to this section as a reminder.
+
 ## How it works
 
 Guidance is organized into four layers, each triggered by the cheapest mechanism
