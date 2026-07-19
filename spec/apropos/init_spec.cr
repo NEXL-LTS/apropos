@@ -51,6 +51,12 @@ describe Apropos::Init do
       stdout.should contain("created  docs/conventions/README.md")
     end
 
+    it "points at the bootstrapping prompt in README.md" do
+      fs = InMemoryFS.new
+      _, stdout, _ = run_init(fs)
+      stdout.should contain("README.md#bootstrapping-from-an-existing-codebase")
+    end
+
     it "is idempotent — a second run changes nothing" do
       fs = InMemoryFS.new
       run_init(fs)
@@ -78,6 +84,7 @@ describe Apropos::Init do
       _, stdout, _ = run_init(fs, Apropos::Init::Options.new(dry_run: true))
       stdout.should contain("would create docs/conventions/README.md")
       stdout.should contain("would create .claude/settings.json")
+      stdout.should_not contain("README.md#bootstrapping-from-an-existing-codebase")
       fs.files.should be_empty
     end
   end
