@@ -26,7 +26,7 @@ triggering is deterministic — and ships as a static Linux binary.
 ## Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/NEXL-LTS/muninn-rules/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/NEXL-LTS/apropos/main/install.sh | sh
 ```
 
 The installer resolves the latest release, verifies its SHA256 checksum, and
