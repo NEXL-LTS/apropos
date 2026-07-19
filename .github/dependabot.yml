@@ -1,0 +1,11 @@
+version: 2
+updates:
+  # Keep the SHA-pinned GitHub Actions fresh. zizmor's unpinned-uses audit
+  # requires hash pinning; Dependabot proposes PRs that bump both the SHA and
+  # the trailing version comment so pins don't silently go stale.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
