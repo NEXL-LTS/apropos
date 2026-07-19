@@ -71,7 +71,7 @@ module Apropos
     private def report_tools(stdout : IO, explicit : Set(String)?, detected : Set(String)) : Nil
       return unless explicit.nil?
       if detected.empty?
-        stdout.puts "auto     no supported CLI agent found on PATH; pass --tool claude|opencode to wire one explicitly"
+        stdout.puts "auto     no supported CLI agent found on PATH; pass --tool claude / --tool opencode to wire one explicitly"
       else
         stdout.puts "auto     detected #{detected.to_a.sort.join(", ")}"
       end

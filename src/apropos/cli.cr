@@ -178,7 +178,9 @@ module Apropos
     # `--tool` validation lives here rather than inline in the parse loop so
     # that loop's cyclomatic complexity stays under the gate.
     private def parse_init_tool(value : String?, opts : InitArgs) : Int32?
-      return command_error("init", "--tool requires a value") if value.nil?
+      # A missing value means the next token is another flag (or nothing) —
+      # treat it as "no value" rather than reporting it as an unknown tool.
+      return command_error("init", "--tool requires a value") if value.nil? || value.starts_with?("--")
       unless Init::KNOWN_TOOLS.includes?(value)
         return command_error("init", "unknown tool '#{value}' (#{Init::KNOWN_TOOLS.to_a.sort.join("|")})")
       end

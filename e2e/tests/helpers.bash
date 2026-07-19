@@ -30,15 +30,17 @@ E2E_AGENTS=(
 # src/util.py).
 register_live_tests() {
   local layer="$1" expect_var="$2" prompt_var="$3" target="$4"
-  # Sanitize to a valid bash identifier fragment — labels may contain spaces
-  # or punctuation (e.g. "Layer 3 (path+content)").
+  # Sanitize to a valid bash identifier fragment — labels (and, below, agent
+  # display names) may contain spaces or punctuation (e.g.
+  # "Layer 3 (path+content)", or a future "GitHub Copilot" entry).
   local slug="${layer//[^A-Za-z0-9]/_}"
-  local entry name require_fn run_fn fn
+  local entry name require_fn run_fn fn name_slug
 
   for entry in "${E2E_AGENTS[@]}"; do
     IFS='|' read -r name require_fn run_fn <<<"$entry"
+    name_slug="${name//[^A-Za-z0-9]/_}"
 
-    fn="test_${slug}_with_${name}"
+    fn="test_${slug}_with_${name_slug}"
     eval "$fn() {
       $require_fn
       new_sample with
@@ -47,7 +49,7 @@ register_live_tests() {
     }"
     bats_test_function --description "$layer with apropos ($name): the expected pattern lands" --tags "" -- "$fn"
 
-    fn="test_${slug}_without_${name}"
+    fn="test_${slug}_without_${name_slug}"
     eval "$fn() {
       $require_fn
       new_sample without
