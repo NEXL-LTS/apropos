@@ -41,16 +41,16 @@ export const MuninnPlugin = async ({ worktree, client }) => {
     }
   }
 
-  function makePayload(input, withContent) {
+  function makePayload(input, args, withContent) {
     return {
       session_id: input.sessionID ?? sessionID,
       cwd: worktree,
       tool_name: input.tool,
       tool_input: {
-        file_path: input.args?.filePath,
+        file_path: args?.filePath,
         ...(withContent ? {
-          content:    input.args?.content,
-          new_string: input.args?.newString,
+          content:    args?.content,
+          new_string: args?.newString,
         } : {}),
       },
     }
@@ -67,19 +67,25 @@ export const MuninnPlugin = async ({ worktree, client }) => {
 
     // Layer 2 — path-scoped: inject BEFORE the write so the model sees
     // the rule while still in the current tool-processing turn.
-    "tool.execute.before": async (input) => {
+    // OpenCode delivers the tool arguments in the SECOND callback
+    // parameter (output.args) for tool.execute.before; older builds put
+    // them on input.args. Read output first, fall back to input.
+    "tool.execute.before": async (input, output) => {
       if (!["edit", "write", "apply_patch"].includes(input.tool)) return
-      if (!input.args?.filePath) return
-      const ctx = await callHook("pre", makePayload(input, false))
+      const args = output?.args ?? input.args
+      if (!args?.filePath) return
+      const ctx = await callHook("pre", makePayload(input, args, false))
       await inject(input.sessionID ?? sessionID, ctx)
     },
 
     // Layer 3 — construct-scoped: inject AFTER the write using the written
-    // content for regex matching.
-    "tool.execute.after": async (input) => {
+    // content for regex matching. Here OpenCode carries args on input;
+    // the same output-first fallback keeps this robust across versions.
+    "tool.execute.after": async (input, output) => {
       if (!["edit", "write", "apply_patch"].includes(input.tool)) return
-      if (!input.args?.filePath) return
-      const ctx = await callHook("post", makePayload(input, true))
+      const args = output?.args ?? input.args
+      if (!args?.filePath) return
+      const ctx = await callHook("post", makePayload(input, args, true))
       await inject(input.sessionID ?? sessionID, ctx)
     },
   }

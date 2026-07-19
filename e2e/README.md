@@ -72,8 +72,8 @@ It then persists across rebuilds. Until you do, the live OpenCode tests skip.
 
 ## Options
 
-- `E2E_MODEL=<model>` — pass a specific model to `claude --model` /
-  `opencode --model` (default: each CLI's configured model). Use a small model
-  (e.g. `E2E_MODEL=claude-haiku-4-5`) for cheaper runs.
+- `E2E_MODEL=<model>` — pass a specific model to `claude -p --model` /
+  `opencode run --model` (default: each CLI's configured model). Use a small
+  model (e.g. `E2E_MODEL=claude-haiku-4-5`) for cheaper runs.
 - `bash e2e/run.sh --no-tempdir-cleanup` — keep the per-test temp dirs for
   inspection.
