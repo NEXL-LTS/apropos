@@ -64,19 +64,6 @@ RUN curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     rm -rf /var/lib/apt/lists/*
 
-# Gemini CLI, Codex CLI, GitHub Copilot CLI — installed globally via npm
-# while still root so their binaries land in /usr/bin, alongside gh/crystal.
-# Pinned (unlike Claude/OpenCode's own installers below) because a bare
-# `npm install -g <pkg>` always resolves latest, making the image drift
-# silently on every rebuild.
-ARG GEMINI_CLI_VERSION=0.51.0
-ARG CODEX_CLI_VERSION=0.144.6
-ARG COPILOT_CLI_VERSION=1.0.71
-RUN npm install -g \
-        @google/gemini-cli@${GEMINI_CLI_VERSION} \
-        @openai/codex@${CODEX_CLI_VERSION} \
-        @github/copilot@${COPILOT_CLI_VERSION}
-
 # kcov — the coverage gate. Ubuntu 24.04 dropped the `kcov` package,
 # so it is built from a pinned release rather than installed from apt. python3
 # is needed only by kcov's build-time code generation; libdw/libcurl/binutils/elf
@@ -172,17 +159,7 @@ RUN set -eux; \
 
 USER vscode
 
-# Claude Code CLI, installed to the user's home.
-# $HOME/$PATH must stay literal so they expand at shell start, not build time.
-# hadolint ignore=SC2016
-RUN curl -fsSL https://claude.ai/install.sh | bash && \
-    echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-
-# opencode CLI, installed to the user's home.
-RUN curl -fsSL https://opencode.ai/install | bash
-
-# Cursor CLI, installed to the user's home. Symlinks both `agent` and the
-# legacy `cursor-agent` name into ~/.local/bin.
-RUN curl -fsS https://cursor.com/install | bash
+RUN mkdir -p /home/vscode/.local
+RUN mkdir -p /home/vscode/.cache
 
 ENV PATH=/home/vscode/.local/bin:$PATH
