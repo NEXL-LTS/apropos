@@ -68,7 +68,9 @@ describe Apropos::Init do
       stdout.should contain("current  .claude/settings.json")
       stdout.should contain("current  .gitignore")
       fs.files[SETTINGS_PATH].should eq(settings_before)
-      fs.files[SETTINGS_PATH].scan("apropos hook pre").size.should eq(1)
+      # Once for the Edit|Write group, once for the Read group — not duplicated
+      # within either.
+      fs.files[SETTINGS_PATH].scan("apropos hook pre").size.should eq(2)
     end
 
     it "overwrites managed scaffolds with --force but never the root file" do
@@ -190,6 +192,43 @@ describe Apropos::Init do
       code.should eq(1)
       stderr.should contain("must be a JSON object")
     end
+
+    it "wires apropos hook pre onto Read too, distinct from the Edit|Write group" do
+      fs = InMemoryFS.new
+      run_init(fs)
+      merged = fs.files[SETTINGS_PATH]
+      merged.scan("apropos hook pre").size.should eq(2)
+      merged.should contain(%("matcher": "Read"))
+      merged.should contain(%("matcher": "Edit|Write"))
+    end
+
+    it "adds apropos hook pre into an existing Read group that has a different command" do
+      seed = %({"hooks":{"PreToolUse":[{"matcher":"Read","hooks":) +
+             %([{"type":"command","command":"echo hi"}]}]}})
+      fs = InMemoryFS.new({SETTINGS_PATH => seed})
+      run_init(fs)
+      merged = fs.files[SETTINGS_PATH]
+      merged.should contain("echo hi")
+      merged.should contain("apropos hook pre")
+      merged.scan(%("matcher": "Read")).size.should eq(1)
+    end
+
+    it "budgets Claude Code's hook timeout in seconds" do
+      fs = InMemoryFS.new
+      run_init(fs)
+      merged = fs.files[SETTINGS_PATH]
+      merged.should contain(%("timeout": 10))
+      merged.should_not contain(%("timeout": 10000))
+    end
+
+    it "does not duplicate the Read group on a second run" do
+      fs = InMemoryFS.new
+      run_init(fs)
+      run_init(fs)
+      merged = fs.files[SETTINGS_PATH]
+      merged.scan("apropos hook pre").size.should eq(2)
+      merged.scan(%("matcher": "Read")).size.should eq(1)
+    end
   end
 
   describe "--tool (explicit selection)" do
@@ -208,6 +247,8 @@ describe Apropos::Init do
       # must read from there (falling back to input) or Layer 2 never fires.
       plugin.should contain("async (input, output)")
       plugin.should contain("output?.args ?? input.args")
+      # Layer 2 fires on OpenCode's "read" tool too, via the same "pre" hook.
+      plugin.should contain(%("edit", "write", "apply_patch", "read"))
       stdout.should contain(".opencode/plugins/apropos.js")
     end
 

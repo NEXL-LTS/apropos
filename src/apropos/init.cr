@@ -165,17 +165,25 @@ module Apropos
       sync(fs, options, stdout, path, merged_settings(existing), existing, ".claude/settings.json")
     end
 
-    # Merge apropos's PreToolUse/PostToolUse hook groups into an existing (or new)
-    # settings object, preserving every other key and hook and adding a group
-    # only when apropos's own command is not already wired for that event.
+    # Merge apropos's PreToolUse/PostToolUse hook groups into an existing (or
+    # new) settings object, preserving every other key and hook. `apropos
+    # hook pre` is wired onto both "Edit|Write" and "Read" — Layer 2 depends
+    # only on the target path, which a read carries exactly like an edit, so
+    # the same rule can land as early as the model's first read instead of
+    # only once it writes there.
     private def merged_settings(existing : String?) : String
       root = settings_root(existing, ".claude/settings.json")
       hooks = (root["hooks"]?.try(&.as_h?)).try(&.dup) || {} of String => JSON::Any
-      {"PreToolUse" => "pre", "PostToolUse" => "post"}.each do |event, sub|
-        groups = (hooks[event]?.try(&.as_a?)).try(&.dup) || [] of JSON::Any
-        groups << apropos_group(sub) unless groups.any? { |group| apropos_group?(group) }
-        hooks[event] = JSON::Any.new(groups)
-      end
+
+      pre_groups = (hooks["PreToolUse"]?.try(&.as_a?)).try(&.dup) || [] of JSON::Any
+      pre_groups = ensure_commands(pre_groups, "Edit|Write", ["apropos hook pre"], CLAUDE_HOOK_TIMEOUT)
+      pre_groups = ensure_command_on_matcher(pre_groups, "Read", "apropos hook pre", CLAUDE_HOOK_TIMEOUT)
+      hooks["PreToolUse"] = JSON::Any.new(pre_groups)
+
+      post_groups = (hooks["PostToolUse"]?.try(&.as_a?)).try(&.dup) || [] of JSON::Any
+      post_groups = ensure_commands(post_groups, "Edit|Write", ["apropos hook post"], CLAUDE_HOOK_TIMEOUT)
+      hooks["PostToolUse"] = JSON::Any.new(post_groups)
+
       root["hooks"] = JSON::Any.new(hooks)
       JSON::Any.new(root).to_pretty_json + "\n"
     end
@@ -193,6 +201,94 @@ module Apropos
       hash.dup
     end
 
+    # Ensure some group in `groups` carries every command in `commands`:
+    # heal a group that already owns *any* of them but is missing others (so
+    # a half-wired setup converges instead of staying stuck, or duplicating),
+    # and append a fresh `matcher`-scoped group only when no group owns any
+    # of them yet. Used by Claude Code's settings merge; Gemini CLI's still
+    # uses its own separate helpers below (`ensure_gemini_group` etc.) — this
+    # assumes a command belongs to at most *one* family. For a command wired
+    # onto more than one matcher (Layer 2's `apropos hook pre` fires on both
+    # an edit and a read), use `ensure_command_on_matcher` instead —
+    # command-ownership healing would otherwise see the command already
+    # present (from the *other* matcher's group) and never add it to this one.
+    private def ensure_commands(groups : Array(JSON::Any), matcher : String,
+                                commands : Array(String), timeout : Int64) : Array(JSON::Any)
+      index = groups.index { |group| owns_any_command?(group, commands) }
+      return groups + [hook_group(matcher, commands, timeout)] if index.nil?
+
+      groups = groups.dup
+      groups[index] = with_missing_hooks(groups[index], commands, timeout)
+      groups
+    end
+
+    # Ensure the group with this exact `matcher` contains `command` —
+    # matcher-keyed, unlike `ensure_commands`' command-ownership healing,
+    # specifically so the same command can be wired onto a second matcher
+    # without the first matcher's group being mistaken for "already done".
+    private def ensure_command_on_matcher(groups : Array(JSON::Any), matcher : String,
+                                          command : String, timeout : Int64) : Array(JSON::Any)
+      index = groups.index { |group| group_matcher(group) == matcher }
+      return groups + [hook_group(matcher, [command], timeout)] if index.nil?
+      return groups if owns_any_command?(groups[index], [command])
+
+      groups = groups.dup
+      groups[index] = with_missing_hooks(groups[index], [command], timeout)
+      groups
+    end
+
+    private def group_matcher(group : JSON::Any) : String?
+      group.as_h?.try(&.["matcher"]?).try(&.as_s?)
+    end
+
+    private def owns_any_command?(group : JSON::Any, commands : Array(String)) : Bool
+      hooks = group.as_h?.try(&.["hooks"]?).try(&.as_a?)
+      return false unless hooks
+      hooks.any? do |hook|
+        command = hook.as_h?.try(&.["command"]?).try(&.as_s?)
+        !command.nil? && commands.includes?(command)
+      end
+    end
+
+    # Refresh every one of *our* commands already in `present` to the current
+    # `hook_command` shape (so a stale field converges on the next `init` run
+    # instead of surviving forever) and append whichever of `commands` is
+    # still missing. Foreign hooks (anything not in `commands`) pass through
+    # untouched.
+    private def with_missing_hooks(group : JSON::Any, commands : Array(String), timeout : Int64) : JSON::Any
+      hash = group.as_h.dup
+      present = hash["hooks"]?.try(&.as_a?) || [] of JSON::Any
+      refreshed = present.map do |hook|
+        command = hook.as_h?.try(&.["command"]?).try(&.as_s?)
+        command && commands.includes?(command) ? hook_command(command, timeout) : hook
+      end
+      present_commands = present.compact_map { |hook| hook.as_h?.try(&.["command"]?).try(&.as_s?) }
+      missing = commands.reject { |command| present_commands.includes?(command) }
+      hash["hooks"] = JSON::Any.new(refreshed + missing.map { |command| hook_command(command, timeout) })
+      JSON::Any.new(hash)
+    end
+
+    private def hook_group(matcher : String, commands : Array(String), timeout : Int64) : JSON::Any
+      JSON::Any.new({
+        "matcher" => JSON::Any.new(matcher),
+        "hooks"   => JSON::Any.new(commands.map { |command| hook_command(command, timeout) }),
+      })
+    end
+
+    private def hook_command(command : String, timeout : Int64) : JSON::Any
+      JSON::Any.new({
+        "type"    => JSON::Any.new("command"),
+        "command" => JSON::Any.new(command),
+        "timeout" => JSON::Any.new(timeout),
+      })
+    end
+
+    # Claude Code's hook `timeout` is seconds.
+    CLAUDE_HOOK_TIMEOUT = 10_i64
+
+    # apropos identifies its own settings entries by this command prefix, so a
+    # merge never duplicates a group it already installed. Still used by
+    # Gemini CLI's own (separate) settings merge below.
     private def apropos_group?(group : JSON::Any) : Bool
       hooks = group.as_h?.try(&.["hooks"]?).try(&.as_a?)
       return false unless hooks
@@ -538,10 +634,13 @@ module Apropos
     # triggering a new AI turn. This is the documented OpenCode API for
     # injecting context from plugins.
     #
-    # Layer 2 (path-scoped) fires via `tool.execute.before` — BEFORE the write —
-    # so the model sees the matching rule while it is still processing the current
-    # tool turn. Layer 3 (construct-scoped) fires via `tool.execute.after` using
-    # the written content for regex matching.
+    # Layer 2 (path-scoped) fires via `tool.execute.before` — on both a write
+    # and a read (Layer 2 depends only on the target path, which a read
+    # carries exactly like an edit, so the rule can land on the model's
+    # first read instead of only once it writes there). Layer 3
+    # (construct-scoped) fires via `tool.execute.after` using the written
+    # content for regex matching — read-only, since it needs content that
+    # doesn't exist yet on a mere read.
     #
     # Both hooks fail open: any error exits silently and never blocks an edit.
     # The session ID is read from `input.sessionID` when available and tracked
@@ -553,7 +652,7 @@ module Apropos
       // with noReply:true, which injects convention context into the conversation
       // without triggering an AI response.
       //
-      // Layer 2 (path-scoped)    — fires via tool.execute.before (pre-write).
+      // Layer 2 (path-scoped)    — fires via tool.execute.before (reads and pre-write).
       // Layer 3 (construct-scoped) — fires via tool.execute.after  (post-write).
       // Both fail open: any error produces no output and never blocks an edit.
       // See docs/conventions/README.md for the layer model.
@@ -615,12 +714,16 @@ module Apropos
           },
 
           // Layer 2 — path-scoped: inject BEFORE the write so the model sees
-          // the rule while still in the current tool-processing turn.
-          // OpenCode delivers the tool arguments in the SECOND callback
-          // parameter (output.args) for tool.execute.before; older builds put
-          // them on input.args. Read output first, fall back to input.
+          // the rule while still in the current tool-processing turn. Also
+          // fires on "read" — Layer 2 depends only on the target path, which
+          // a read carries exactly like an edit, so the rule can land as
+          // early as the model's first read instead of only once it writes
+          // there. OpenCode delivers the tool arguments in the SECOND
+          // callback parameter (output.args) for tool.execute.before; older
+          // builds put them on input.args. Read output first, fall back to
+          // input.
           "tool.execute.before": async (input, output) => {
-            if (!["edit", "write", "apply_patch"].includes(input.tool)) return
+            if (!["edit", "write", "apply_patch", "read"].includes(input.tool)) return
             const args = output?.args ?? input.args
             if (!args?.filePath) return
             const ctx = await callHook("pre", makePayload(input, args, false))

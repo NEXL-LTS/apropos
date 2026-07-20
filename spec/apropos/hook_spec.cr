@@ -70,6 +70,10 @@ private def write_json(file_path : String, content : String, session_id : String
    tool_input: {file_path: file_path, content: content}}.to_json
 end
 
+private def read_json(file_path : String, session_id : String? = "s", cwd : String? = "/repo") : String
+  {session_id: session_id, tool_name: "Read", cwd: cwd, tool_input: {file_path: file_path}}.to_json
+end
+
 private def invoke(event : Symbol, input : String, fs : Apropos::Filesystem,
                    override : String? = "/repo", now : Time = NOW, verbose : Bool = false) : {Int32, String}
   stdout = IO::Memory.new
@@ -109,7 +113,7 @@ describe Apropos::Hook do
 
     it "emits nothing when no Layer 2 rule matches the path" do
       fs = InMemoryFS.new({A_PATH => A_DOC})
-      code, stdout = invoke(:pre, pre_json("docs/readme.md"), fs)
+      code, stdout = invoke(:pre, pre_json("docs/readme.md", session_id: nil), fs)
       code.should eq(0)
       stdout.should be_empty
     end
@@ -127,13 +131,13 @@ describe Apropos::Hook do
     end
 
     it "resolves the repo root from the payload cwd when no override is given" do
-      code, stdout = invoke(:pre, pre_json("src/app.cr", cwd: Dir.current), InMemoryFS.new, override: nil)
+      code, stdout = invoke(:pre, pre_json("src/app.cr", cwd: Dir.current, session_id: nil), InMemoryFS.new, override: nil)
       code.should eq(0)
       stdout.should be_empty
     end
 
     it "falls back to the process directory when the payload has no cwd" do
-      code, stdout = invoke(:pre, pre_json("src/app.cr", cwd: nil), InMemoryFS.new, override: nil)
+      code, stdout = invoke(:pre, pre_json("src/app.cr", cwd: nil, session_id: nil), InMemoryFS.new, override: nil)
       code.should eq(0)
       stdout.should be_empty
     end
@@ -148,7 +152,7 @@ describe Apropos::Hook do
     it "uses an existing index and emits nothing when the source doc is unreadable" do
       index = Apropos::Index.build([Apropos::Convention.parse("docs/conventions/a.md", A_DOC)])
       fs = InMemoryFS.new({"/repo/.cache/apropos/index.json" => index.to_document})
-      code, stdout = invoke(:pre, pre_json("src/app.cr"), fs)
+      code, stdout = invoke(:pre, pre_json("src/app.cr", session_id: nil), fs)
       code.should eq(0)
       stdout.should be_empty
     end
@@ -217,14 +221,14 @@ describe Apropos::Hook do
         .should contain("Convention (docs/conventions/models.md):")
 
       other = InMemoryFS.new({MODELS_PATH => MODELS_DOC})
-      code, stdout = invoke(:post, write_json("scripts/one_off.cr", "User.update_all(x: 1)"), other)
+      code, stdout = invoke(:post, write_json("scripts/one_off.cr", "User.update_all(x: 1)", nil), other)
       code.should eq(0)
       stdout.should be_empty
     end
 
     it "emits nothing when no Layer 3 content matches" do
       fs = InMemoryFS.new({DB_PATH => DB_DOC})
-      code, stdout = invoke(:post, write_json("lib/x.cr", "just some code"), fs)
+      code, stdout = invoke(:post, write_json("lib/x.cr", "just some code", nil), fs)
       code.should eq(0)
       stdout.should be_empty
     end
@@ -239,7 +243,7 @@ describe Apropos::Hook do
 
     it "emits nothing when there is neither content nor a file to read" do
       fs = InMemoryFS.new({DB_PATH => DB_DOC})
-      input = %({"session_id":"s","tool_name":"Write","cwd":"/repo","tool_input":{"file_path":"lib/gone.cr"}})
+      input = %({"tool_name":"Write","cwd":"/repo","tool_input":{"file_path":"lib/gone.cr"}})
       code, stdout = invoke(:post, input, fs)
       code.should eq(0)
       stdout.should be_empty
@@ -251,6 +255,81 @@ describe Apropos::Hook do
               %({"file_path":"lib/x.cr","edits":[{"new_string":"noop"},{"new_string":"begin transaction"}]}})
       _, stdout = invoke(:post, input, fs)
       stdout.should contain("Convention (docs/conventions/db.md):")
+    end
+  end
+
+  # `Hook.pre` is also wired onto each agent's *read* tool (see init.cr) —
+  # Layer 2 depends only on the target path, which a read carries exactly
+  # like an edit, so the same method (no separate read-only handler needed)
+  # delivers the rule as early as the model's first read of a file.
+  describe ".pre (fired from a read tool)" do
+    it "injects a matching Layer 2 rule from a Read-shaped payload" do
+      fs = InMemoryFS.new({A_PATH => A_DOC})
+      code, stdout = invoke(:pre, read_json("src/app.cr"), fs)
+      code.should eq(0)
+      stdout.should contain("Convention (docs/conventions/a.md):")
+    end
+
+    it "still delivers the session notice on a read, even when no rule matches" do
+      code, stdout = invoke(:pre, read_json("docs/readme.md"), InMemoryFS.new)
+      code.should eq(0)
+      stdout.should contain("No need to search for coding conventions")
+    end
+  end
+
+  # The one-time "don't bother exploring docs/conventions/ yourself" notice —
+  # delivered on whichever of pre/post fires first for a session, regardless
+  # of whether that particular edit matches any rule, so a model that would
+  # otherwise proactively `cat` the conventions directory gets steered away
+  # from a path that has nothing to do with apropos's actual delivery
+  # mechanism (see the AGENTS.md discussion this followed from).
+  describe "session-start notice" do
+    it "fires on the first call even when no rule matches" do
+      code, stdout = invoke(:pre, pre_json("docs/readme.md"), InMemoryFS.new)
+      code.should eq(0)
+      stdout.should contain("No need to search for coding conventions")
+    end
+
+    it "is combined with a real match on the very first call" do
+      fs = InMemoryFS.new({A_PATH => A_DOC})
+      _, stdout = invoke(:pre, pre_json("src/app.cr"), fs)
+      stdout.should contain("No need to search for coding conventions")
+      stdout.should contain("Convention (docs/conventions/a.md):")
+    end
+
+    it "does not repeat on a second call in the same session" do
+      fs = InMemoryFS.new
+      invoke(:pre, pre_json("docs/readme.md"), fs)
+      code, stdout = invoke(:pre, pre_json("docs/other.md"), fs)
+      code.should eq(0)
+      stdout.should be_empty
+    end
+
+    it "is claimed by whichever of pre/post fires first" do
+      fs = InMemoryFS.new({DB_PATH => DB_DOC})
+      pre_stdout = invoke(:pre, pre_json("docs/readme.md"), fs)[1]
+      pre_stdout.should contain("No need to search for coding conventions")
+
+      code, post_stdout = invoke(:post, write_json("lib/x.cr", "just some code"), fs)
+      code.should eq(0)
+      post_stdout.should be_empty
+    end
+
+    it "a read delivers Layer 2 + the notice; the edit that follows gets neither repeated" do
+      fs = InMemoryFS.new({A_PATH => A_DOC})
+      read_stdout = invoke(:pre, read_json("src/app.cr"), fs)[1]
+      read_stdout.should contain("No need to search for coding conventions")
+      read_stdout.should contain("Convention (docs/conventions/a.md):")
+
+      code, edit_stdout = invoke(:pre, pre_json("src/app.cr"), fs)
+      code.should eq(0)
+      edit_stdout.should be_empty
+    end
+
+    it "is skipped when there is no session id to key it on" do
+      code, stdout = invoke(:pre, pre_json("docs/readme.md", session_id: nil), InMemoryFS.new)
+      code.should eq(0)
+      stdout.should be_empty
     end
   end
 

@@ -67,6 +67,28 @@ describe Apropos::SessionState do
       fs = InMemoryFS.new({session_path("s") => "{broken"})
       Apropos::SessionState.load(ROOT, fs, "s").injected.should be_empty
     end
+
+    it "defaults notified? to false when absent (older session files)" do
+      Apropos::SessionState.load(ROOT, InMemoryFS.new, "s").notified?.should be_false
+    end
+
+    it "round-trips a persisted notified flag" do
+      fs = InMemoryFS.new
+      state = Apropos::SessionState.new
+      state.notify!
+      state.save(ROOT, fs, "s", NOW)
+
+      Apropos::SessionState.load(ROOT, fs, "s").notified?.should be_true
+    end
+  end
+
+  describe "#notify!" do
+    it "marks the state notified" do
+      state = Apropos::SessionState.new
+      state.notified?.should be_false
+      state.notify!
+      state.notified?.should be_true
+    end
   end
 
   describe "#save" do
@@ -78,7 +100,7 @@ describe Apropos::SessionState do
       state.save(ROOT, fs, "s", NOW)
 
       written = fs.files[session_path("s")]
-      written.should eq(%({"updated_at":#{NOW.to_unix},"injected":["a.md","z.md"]}) + "\n")
+      written.should eq(%({"updated_at":#{NOW.to_unix},"injected":["a.md","z.md"],"notified":false}) + "\n")
     end
 
     it "is a no-op without a session id" do
