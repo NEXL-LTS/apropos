@@ -71,7 +71,9 @@ module Apropos
         "(Layer 3, post-write) and injects context using noReply:true. Gemini " \
         "CLI calls both `hook pre` and `hook post` from its AfterTool event, " \
         "since its BeforeTool event cannot inject context — Layer 2 still " \
-        "fires, just after the edit. All hooks fail open."),
+        "fires, just after the edit — plus `hook pre` again from AfterTool's " \
+        "read_file match, so Layer 2 can also land on a plain read. All hooks " \
+        "fail open."),
       Command.new("match", "Resolve the conventions that apply to given paths",
         "Use match in a review to see which rules apply to a file — Layer 2 by " \
         "path, Layer 3 by on-disk (or --stdin-content) content — in paths, json, " \
