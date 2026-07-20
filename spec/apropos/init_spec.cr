@@ -88,6 +88,14 @@ describe Apropos::Init do
       stdout.should_not contain("README.md#bootstrapping-from-an-existing-codebase")
       fs.files.should be_empty
     end
+
+    it "scaffolds into apropos.yml's configured conventions_dir instead of the default" do
+      fs = InMemoryFS.new({"/repo/apropos.yml" => "conventions_dir: ../shared-conventions\n"})
+      _, stdout, _ = run_init(fs)
+      fs.files.has_key?("/repo/../shared-conventions/README.md").should be_true
+      fs.files.has_key?("/repo/docs/conventions/README.md").should be_false
+      stdout.should contain("created  ../shared-conventions/README.md")
+    end
   end
 
   describe "--example" do

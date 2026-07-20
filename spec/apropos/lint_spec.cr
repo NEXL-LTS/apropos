@@ -3,10 +3,15 @@ require "../spec_helper"
 private ROOT = Path["/repo"]
 
 private def run_lint(fs : Apropos::Filesystem, strict : Bool = false) : {Int32, String}
+  code, stdout, _ = run_lint_full(fs, strict)
+  {code, stdout}
+end
+
+private def run_lint_full(fs : Apropos::Filesystem, strict : Bool = false) : {Int32, String, String}
   stdout = IO::Memory.new
   stderr = IO::Memory.new
   code = Apropos::Lint.run(ROOT, fs, strict, stdout, stderr)
-  {code, stdout.to_s}
+  {code, stdout.to_s, stderr.to_s}
 end
 
 private def doc(name : String) : String
@@ -38,6 +43,14 @@ describe Apropos::Lint do
     code, stdout = run_lint(fs)
     code.should eq(1)
     stdout.should contain("error  docs/conventions/bad.md:")
+  end
+
+  it "fails closed on a malformed apropos.yml rather than defaulting silently" do
+    fs = InMemoryFS.new({"/repo/apropos.yml" => "key: [unterminated\n"})
+    code, _, stderr = run_lint_full(fs)
+    code.should eq(1)
+    stderr.should contain("apropos lint:")
+    stderr.should contain("not valid YAML")
   end
 
   it "warns on unknown frontmatter keys" do

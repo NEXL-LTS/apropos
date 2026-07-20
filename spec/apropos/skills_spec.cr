@@ -31,6 +31,15 @@ describe Apropos::Skills do
         SKILL
     end
 
+    it "inlines the doc body instead of a pointer when the source lives outside the repo" do
+      conventions = [convention("../shared-conventions/workflows/foo.md",
+        %(skill: true\ndescription: "Use when foo"))]
+
+      wrapper = Apropos::Skills.wrappers(conventions)["foo"]
+      wrapper.should_not contain("Read `")
+      wrapper.should contain("body")
+    end
+
     it "ignores docs without skill: true" do
       conventions = [
         convention("docs/conventions/a.md", %(paths: ["src/**"])),
