@@ -297,6 +297,39 @@ describe Apropos::Init do
       fs.files[GEMINI_SETTINGS_PATH].scan("apropos hook pre").size.should eq(1)
     end
 
+    it "adds the missing command into the existing group when only pre is present" do
+      seed = %({"hooks":{"AfterTool":[{"matcher":"write_file|replace","hooks":) +
+             %([{"type":"command","command":"apropos hook pre","timeout":10}]}]}})
+      fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      merged = fs.files[GEMINI_SETTINGS_PATH]
+      merged.scan("apropos hook pre").size.should eq(1)
+      merged.scan("apropos hook post").size.should eq(1)
+      merged.scan("AfterTool").size.should eq(1) # converged into the one existing group, not a second
+    end
+
+    it "adds the missing command into the existing group when only post is present" do
+      seed = %({"hooks":{"AfterTool":[{"matcher":"write_file|replace","hooks":) +
+             %([{"type":"command","command":"apropos hook post","timeout":10}]}]}})
+      fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      merged = fs.files[GEMINI_SETTINGS_PATH]
+      merged.scan("apropos hook pre").size.should eq(1)
+      merged.scan("apropos hook post").size.should eq(1)
+    end
+
+    it "preserves the group's matcher and a foreign hook alongside it while healing" do
+      seed = %({"hooks":{"AfterTool":[{"matcher":"custom_matcher","hooks":) +
+             %([{"type":"command","command":"echo hi"},) +
+             %({"type":"command","command":"apropos hook pre"}]}]}})
+      fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      merged = fs.files[GEMINI_SETTINGS_PATH]
+      merged.should contain(%("matcher": "custom_matcher"))
+      merged.should contain("echo hi")
+      merged.should contain("apropos hook post")
+    end
+
     it "preserves foreign keys and an existing fileName list" do
       seed = %({"model": "gemini-pro", "context": {"fileName": ["CONTEXT.md"]}})
       fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
