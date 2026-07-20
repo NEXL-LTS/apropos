@@ -249,11 +249,33 @@ module Apropos
       root = settings_root(existing, ".gemini/settings.json")
       hooks = (root["hooks"]?.try(&.as_h?)).try(&.dup) || {} of String => JSON::Any
       groups = (hooks["AfterTool"]?.try(&.as_a?)).try(&.dup) || [] of JSON::Any
-      groups << gemini_apropos_group unless groups.any? { |group| apropos_group?(group) }
-      hooks["AfterTool"] = JSON::Any.new(groups)
+      hooks["AfterTool"] = JSON::Any.new(ensure_gemini_group(groups))
       root["hooks"] = JSON::Any.new(hooks)
       root["context"] = merged_gemini_context(root["context"]?)
       JSON::Any.new(root).to_pretty_json + "\n"
+    end
+
+    # Converge to fully wired even when a prior run (or a hand-edit) left only
+    # one of the two commands present: add the missing command(s) into the
+    # existing apropos-owned group rather than skipping just because *a*
+    # apropos command is already there, so a half-wired repo self-heals on
+    # re-run instead of needing a manual JSON edit.
+    private def ensure_gemini_group(groups : Array(JSON::Any)) : Array(JSON::Any)
+      index = groups.index { |group| apropos_group?(group) }
+      return groups + [gemini_apropos_group] if index.nil?
+
+      groups = groups.dup
+      groups[index] = with_missing_gemini_hooks(groups[index])
+      groups
+    end
+
+    private def with_missing_gemini_hooks(group : JSON::Any) : JSON::Any
+      hash = group.as_h.dup
+      present = hash["hooks"]?.try(&.as_a?) || [] of JSON::Any
+      commands = present.compact_map { |hook| hook.as_h?.try(&.["command"]?).try(&.as_s?) }
+      missing = GEMINI_HOOK_COMMANDS.reject { |command| commands.includes?(command) }
+      hash["hooks"] = JSON::Any.new(present + missing.map { |command| gemini_hook(command) })
+      JSON::Any.new(hash)
     end
 
     # Add `AGENTS.md` to `context.fileName` (creating it as a one-element
@@ -269,20 +291,20 @@ module Apropos
       JSON::Any.new(context)
     end
 
+    GEMINI_HOOK_COMMANDS = ["apropos hook pre", "apropos hook post"]
+
     private def gemini_apropos_group : JSON::Any
-      pre = JSON::Any.new({
-        "type"    => JSON::Any.new("command"),
-        "command" => JSON::Any.new("apropos hook pre"),
-        "timeout" => JSON::Any.new(10_i64),
-      })
-      post = JSON::Any.new({
-        "type"    => JSON::Any.new("command"),
-        "command" => JSON::Any.new("apropos hook post"),
-        "timeout" => JSON::Any.new(10_i64),
-      })
       JSON::Any.new({
         "matcher" => JSON::Any.new("write_file|replace"),
-        "hooks"   => JSON::Any.new([pre, post]),
+        "hooks"   => JSON::Any.new(GEMINI_HOOK_COMMANDS.map { |command| gemini_hook(command) }),
+      })
+    end
+
+    private def gemini_hook(command : String) : JSON::Any
+      JSON::Any.new({
+        "type"    => JSON::Any.new("command"),
+        "command" => JSON::Any.new(command),
+        "timeout" => JSON::Any.new(10_i64),
       })
     end
 
