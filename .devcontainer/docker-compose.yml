@@ -38,6 +38,8 @@ services:
     security_opt:
       - seccomp:unconfined
     command: sleep infinity
+    environment:
+      - GH_TOKEN=${GH_TOKEN}
 
 volumes:
   claude-data:
