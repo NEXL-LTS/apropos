@@ -10,12 +10,19 @@ require "./rendering"
 require "./hooks/payload"
 
 module Apropos
-  # The Claude Code hook runtime. `pre` delivers Layer 2
-  # (path-scoped) guidance on PreToolUse; `post` delivers Layer 3
-  # (construct-scoped) guidance on PostToolUse. Both read the trigger index (the
-  # hot path never parses YAML), match against it, dedup per session,
-  # render the matched rule bodies under a character cap, and emit the
-  # `additionalContext` envelope.
+  # The hook runtime shared by every wired CLI agent. `pre` delivers Layer 2
+  # (path-scoped) guidance; `post` delivers Layer 3 (construct-scoped)
+  # guidance. Both read the trigger index (the hot path never parses YAML),
+  # match against it, dedup per session, render the matched rule bodies under
+  # a character cap, and emit the `additionalContext` envelope.
+  #
+  # `pre`/`post` name Claude Code's PreToolUse/PostToolUse events, but the
+  # logic is tool-agnostic: neither method gates on `tool_name`, so the same
+  # code runs unchanged for OpenCode's plugin bridge and for Gemini CLI, whose
+  # `write_file`/`replace` tools happen to use the exact `file_path`/`content`/
+  # `old_string`/`new_string` argument names Claude's do. Gemini wires both
+  # `pre` and `post` onto its single `AfterTool` event (see `init.cr`) since
+  # its `BeforeTool` output schema cannot inject context.
   #
   # Everything here fails **open**: any internal error exits 0 and
   # emits nothing, so a conventions tool can never block or break an edit. All

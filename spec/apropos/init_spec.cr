@@ -1,11 +1,12 @@
 require "../spec_helper"
 
-private ROOT          = Path["/repo"]
-private README_PATH   = "/repo/docs/conventions/README.md"
-private AGENTS_PATH   = "/repo/AGENTS.md"
-private SETTINGS_PATH = "/repo/.claude/settings.json"
-private GITIGNORE     = "/repo/.gitignore"
-private PLUGIN_PATH   = "/repo/.opencode/plugins/apropos.js"
+private ROOT                 = Path["/repo"]
+private README_PATH          = "/repo/docs/conventions/README.md"
+private AGENTS_PATH          = "/repo/AGENTS.md"
+private SETTINGS_PATH        = "/repo/.claude/settings.json"
+private GITIGNORE            = "/repo/.gitignore"
+private PLUGIN_PATH          = "/repo/.opencode/plugins/apropos.js"
+private GEMINI_SETTINGS_PATH = "/repo/.gemini/settings.json"
 
 # A configurable Environment double: `present` is the set of CLI agent
 # binaries that resolve on PATH, used to exercise auto-detection.
@@ -263,6 +264,181 @@ describe Apropos::Init do
       fs.files.has_key?(SETTINGS_PATH).should be_false
       fs.files.has_key?(PLUGIN_PATH).should be_false
       stdout.should contain("no supported CLI agent found on PATH")
+    end
+  end
+
+  describe "gemini settings.json merge" do
+    it "writes AfterTool hooks and context.fileName" do
+      fs = InMemoryFS.new
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      content = fs.files[GEMINI_SETTINGS_PATH]
+      content.should contain("AfterTool")
+      content.should contain("apropos hook pre")
+      content.should contain("apropos hook post")
+      content.should contain("write_file|replace")
+      content.should contain(%("fileName"))
+      content.should contain("AGENTS.md")
+    end
+
+    it "does not wire BeforeTool — Gemini's BeforeTool cannot inject context" do
+      fs = InMemoryFS.new
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      fs.files[GEMINI_SETTINGS_PATH].should_not contain("BeforeTool")
+    end
+
+    it "is idempotent — re-running reports current and does not duplicate the group" do
+      fs = InMemoryFS.new
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      before = fs.files[GEMINI_SETTINGS_PATH]
+
+      _, stdout, _ = run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      stdout.should contain("current  .gemini/settings.json")
+      fs.files[GEMINI_SETTINGS_PATH].should eq(before)
+      # Once in the write_file|replace group, once in the read_file group.
+      fs.files[GEMINI_SETTINGS_PATH].scan("apropos hook pre").size.should eq(2)
+    end
+
+    it "adds the missing command into the existing group when only pre is present" do
+      seed = %({"hooks":{"AfterTool":[{"matcher":"write_file|replace","hooks":) +
+             %([{"type":"command","command":"apropos hook pre","timeout":10}]}]}})
+      fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      merged = fs.files[GEMINI_SETTINGS_PATH]
+      # Once in the healed write_file|replace group, once in the freshly-added
+      # read_file group.
+      merged.scan("apropos hook pre").size.should eq(2)
+      merged.scan("apropos hook post").size.should eq(1)
+      merged.scan(%("matcher": "write_file|replace")).size.should eq(1) # converged, not a second
+    end
+
+    it "adds the missing command into the existing group when only post is present" do
+      seed = %({"hooks":{"AfterTool":[{"matcher":"write_file|replace","hooks":) +
+             %([{"type":"command","command":"apropos hook post","timeout":10}]}]}})
+      fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      merged = fs.files[GEMINI_SETTINGS_PATH]
+      merged.scan("apropos hook pre").size.should eq(2)
+      merged.scan("apropos hook post").size.should eq(1)
+    end
+
+    it "wires apropos hook pre onto a read_file-matched AfterTool group too, distinct from write_file|replace" do
+      fs = InMemoryFS.new
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      content = fs.files[GEMINI_SETTINGS_PATH]
+      content.scan("apropos hook pre").size.should eq(2)
+      content.should contain(%("matcher": "read_file"))
+    end
+
+    it "budgets the AfterTool hook timeout in milliseconds, not Claude Code's seconds" do
+      fs = InMemoryFS.new
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      fs.files[GEMINI_SETTINGS_PATH].should contain(%("timeout": 10000))
+    end
+
+    it "refreshes a stale timeout on an already-wired command when healing (e.g. after an apropos upgrade)" do
+      seed = %({"hooks":{"AfterTool":[{"matcher":"write_file|replace","hooks":) +
+             %([{"type":"command","command":"apropos hook pre","timeout":10},) +
+             %({"type":"command","command":"apropos hook post","timeout":10}]}]}})
+      fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      merged = fs.files[GEMINI_SETTINGS_PATH]
+      # pre and post converged (not just newly-added commands), plus the
+      # freshly-added read_file group's own pre command — all three at 10000.
+      merged.scan(%("timeout": 10000)).size.should eq(3)
+    end
+
+    it "does not duplicate the read_file group on a second run" do
+      fs = InMemoryFS.new
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      merged = fs.files[GEMINI_SETTINGS_PATH]
+      merged.scan("apropos hook pre").size.should eq(2)
+      merged.scan(%("matcher": "read_file")).size.should eq(1)
+    end
+
+    it "adds apropos hook pre into an existing read_file group that has a different command" do
+      seed = %({"hooks":{"AfterTool":[{"matcher":"read_file","hooks":) +
+             %([{"type":"command","command":"echo hi"}]}]}})
+      fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      merged = fs.files[GEMINI_SETTINGS_PATH]
+      merged.should contain("echo hi")
+      merged.should contain("apropos hook pre")
+      merged.scan(%("matcher": "read_file")).size.should eq(1)
+    end
+
+    it "does not mistake an existing read_file group for the write group to heal" do
+      seed = %({"hooks":{"AfterTool":[{"matcher":"read_file","hooks":) +
+             %([{"type":"command","command":"apropos hook pre","timeout":10000}]}]}})
+      fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      merged = fs.files[GEMINI_SETTINGS_PATH]
+      merged.scan(%("matcher": "read_file")).size.should eq(1)
+      merged.scan(%("matcher": "write_file|replace")).size.should eq(1)
+      read_group = merged.split(%("matcher": "write_file|replace")).first
+      read_group.should_not contain("apropos hook post")
+    end
+
+    it "refreshes a stale timeout on the read_file group's own pre command too" do
+      seed = %({"hooks":{"AfterTool":[{"matcher":"read_file","hooks":) +
+             %([{"type":"command","command":"apropos hook pre","timeout":10}]}]}})
+      fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      merged = fs.files[GEMINI_SETTINGS_PATH]
+      merged.should_not contain(%("timeout": 10,))
+      merged.scan(%("timeout": 10000)).size.should eq(3) # read's pre, write's pre, write's post
+    end
+
+    it "preserves the group's matcher and a foreign hook alongside it while healing" do
+      seed = %({"hooks":{"AfterTool":[{"matcher":"custom_matcher","hooks":) +
+             %([{"type":"command","command":"echo hi"},) +
+             %({"type":"command","command":"apropos hook pre"}]}]}})
+      fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      merged = fs.files[GEMINI_SETTINGS_PATH]
+      merged.should contain(%("matcher": "custom_matcher"))
+      merged.should contain("echo hi")
+      merged.should contain("apropos hook post")
+    end
+
+    it "preserves foreign keys and an existing fileName list" do
+      seed = %({"model": "gemini-pro", "context": {"fileName": ["CONTEXT.md"]}})
+      fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      merged = fs.files[GEMINI_SETTINGS_PATH]
+      merged.should contain(%("model": "gemini-pro"))
+      merged.should contain("CONTEXT.md")
+      merged.should contain("AGENTS.md")
+    end
+
+    it "does not duplicate AGENTS.md when it is already listed" do
+      seed = %({"context": {"fileName": ["AGENTS.md"]}})
+      fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      fs.files[GEMINI_SETTINGS_PATH].scan("AGENTS.md").size.should eq(1)
+    end
+
+    it "upgrades a single fileName string to an array rather than clobbering it" do
+      seed = %({"context": {"fileName": "CONTEXT.md"}})
+      fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      merged = fs.files[GEMINI_SETTINGS_PATH]
+      merged.should contain("CONTEXT.md")
+      merged.should contain("AGENTS.md")
+    end
+
+    it "fails closed on malformed existing gemini settings JSON" do
+      fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => "{not json"})
+      code, _, stderr = run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      code.should eq(1)
+      stderr.should contain("not valid JSON")
+    end
+
+    it "auto-detects gemini on PATH" do
+      fs = InMemoryFS.new
+      _, stdout, _ = run_init(fs, Apropos::Init::Options.new, FakeEnv.new(Set{"gemini"}))
+      fs.files.has_key?(GEMINI_SETTINGS_PATH).should be_true
+      stdout.should contain("detected gemini")
     end
   end
 

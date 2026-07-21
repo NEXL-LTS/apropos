@@ -17,6 +17,7 @@ module Apropos
     INDEX_RELATIVE           = Path[".cache", "apropos", "index.json"]
     SETTINGS_RELATIVE        = Path[".claude", "settings.json"]
     OPENCODE_PLUGIN_RELATIVE = Path[".opencode", "plugins", "apropos.js"]
+    GEMINI_SETTINGS_RELATIVE = Path[".gemini", "settings.json"]
     PROBE_RELATIVE           = Path[".cache", "apropos", ".doctor-probe"]
 
     APROPOS_HOOK_PREFIX = "apropos hook"
@@ -34,6 +35,7 @@ module Apropos
         apropos_check(env),
         claude_check(env),
         opencode_check(repo_root, fs, env),
+        gemini_check(repo_root, fs, env),
         index_check(repo_root, fs),
         cache_check(repo_root, fs),
       ]
@@ -133,6 +135,55 @@ module Apropos
         Check.new(:ok, "opencode", "plugin wired")
       else
         Check.new(:warn, "opencode", "plugin absent; run `apropos init --tool opencode`")
+      end
+    end
+
+    # Check for the Gemini CLI binary and that its AfterTool hook (the only
+    # event whose output schema supports injecting context) calls both
+    # `apropos hook pre` and `apropos hook post`. Advisory only: never fails,
+    # so a Gemini-less repo is not penalised.
+    private def gemini_check(repo_root : Path, fs : Filesystem, env : Environment) : Check
+      unless env.which("gemini")
+        return Check.new(:ok, "gemini", "not on PATH; skipped hook check")
+      end
+      content = fs.read?(repo_root.join(GEMINI_SETTINGS_RELATIVE).to_s)
+      return Check.new(:warn, "gemini", ".gemini/settings.json absent; run `apropos init --tool gemini`") unless content
+
+      wired = gemini_wired?(content)
+      return Check.new(:warn, "gemini", ".gemini/settings.json is not valid JSON") if wired.nil?
+
+      if wired
+        Check.new(:ok, "gemini", "AfterTool hook wired")
+      else
+        Check.new(:warn, "gemini", "AfterTool hook absent; run `apropos init --tool gemini`")
+      end
+    end
+
+    # Whether any single `AfterTool` group calls both `apropos hook pre` and
+    # `apropos hook post`. Returns nil when the settings file is not
+    # parseable JSON.
+    #
+    # Checked per group, not flattened across all of them: Gemini can have a
+    # second, read-only group carrying only `apropos hook pre` (see
+    # `Init#ensure_gemini_read_group`), so a flattened union of commands
+    # across every group could see both commands present overall while the
+    # write/edit group itself is missing one — e.g. `pre` only in the read
+    # group and `post` in the write group, which is a miswire (Layer 2 never
+    # fires on an edit) that a flattened check can't tell apart from being
+    # fully wired. Same principle as docs/conventions/settings-merge-identity.md.
+    private def gemini_wired?(content : String) : Bool?
+      parsed =
+        begin
+          JSON.parse(content)
+        rescue JSON::ParseException
+          return nil
+        end
+      groups = parsed.as_h?.try(&.["hooks"]?).try(&.as_h?).try(&.["AfterTool"]?).try(&.as_a?)
+      return false unless groups
+      groups.compact_map(&.as_h?).any? do |group|
+        commands = (group["hooks"]?.try(&.as_a?) || [] of JSON::Any)
+          .compact_map { |hook| hook.as_h?.try(&.["command"]?).try(&.as_s?) }
+        commands.includes?("apropos hook pre") && commands.includes?("apropos hook post")
       end
     end
 

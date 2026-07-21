@@ -21,7 +21,10 @@ triggering is deterministic — and ships as a static Linux binary.
 
 - **Claude Code** — PreToolUse/PostToolUse hooks, `AGENTS.md`/`CLAUDE.md`, and generated `SKILL.md` wrappers.
 - **OpenCode** — `tool.execute.before`/`tool.execute.after` plugin hooks, same root file and generated skills.
-- **Gemini CLI**, **Codex**, **GitHub Copilot CLI**, and **Cursor CLI** — coming soon.
+- **Gemini CLI** — both Layer 2 and Layer 3 delivered via its `AfterTool` hook (its `BeforeTool` event
+  can't inject context, so Layer 2 lands right after the edit rather than before it), `AGENTS.md` via
+  `context.fileName`, and generated `.gemini/skills/*/SKILL.md` wrappers.
+- **Codex**, **GitHub Copilot CLI**, and **Cursor CLI** — coming soon.
 
 ## Install
 
@@ -68,10 +71,14 @@ auto-detects: if `claude` is on PATH it wires two hooks into
 `.claude/settings.json` (`apropos hook pre` → PreToolUse → Layer 2,
 path-scoped; `apropos hook post` → PostToolUse → Layer 3, construct-scoped);
 if `opencode` is on PATH it generates the OpenCode plugin bridge instead (or
-as well). Pass `--tool claude` / `--tool opencode` (repeatable) to wire
-specific agents explicitly regardless of PATH. You never run the hooks
-themselves by hand — the agent calls them, and they inject the matching
-conventions as context.
+as well); if `gemini` is on PATH it wires both `apropos hook pre` and
+`apropos hook post` into `.gemini/settings.json`'s `AfterTool` event (Gemini's
+`BeforeTool` event has no way to inject context back into the model, so Layer
+2 degrades to firing right after the edit) and points `context.fileName` at
+`AGENTS.md`. Pass `--tool claude` / `--tool opencode` / `--tool gemini`
+(repeatable) to wire specific agents explicitly regardless of PATH. You never
+run the hooks themselves by hand — the agent calls them, and they inject the
+matching conventions as context.
 
 Run `apropos help` for the full mental model (also `apropos help --format json` for
 the machine-readable form, or `apropos help <command>`).
@@ -181,7 +188,7 @@ conventions apply to a diff, so review prompts carry zero copies of the rules.
 
 | Command | Purpose |
 | --- | --- |
-| `apropos init` | Bootstrap the convention structure into a repo (idempotent; `--tool claude\|opencode` — repeatable, auto-detects by default — plus `--force`, `--example`, `--claude-symlink`, `--dry-run`). |
+| `apropos init` | Bootstrap the convention structure into a repo (idempotent; `--tool claude\|opencode\|gemini` — repeatable, auto-detects by default — plus `--force`, `--example`, `--claude-symlink`, `--dry-run`). |
 | `apropos generate` | Compile frontmatter into the trigger index and skill wrappers. `--check` is the CI drift gate. |
 | `apropos hook pre` / `hook post` | Hook handlers for the wired CLI agent (Layer 2 / Layer 3). Fail open — never block an edit. |
 | `apropos match <paths>` | Resolve the conventions applying to given files (`--format paths\|json\|full`). |

@@ -13,12 +13,16 @@ private def doc(name : String) : String
   "/repo/docs/conventions/#{name}"
 end
 
-# The correct on-disk wrapper for a skill doc, so drift tests can install a
+# The correct on-disk wrappers for a skill doc across every generated root
+# (`.claude/skills`, `.gemini/skills`), so drift tests can install a
 # byte-accurate baseline via the real generator.
-private def wrapper_for(name : String, text : String) : {String, String}
+private def wrapper_for(name : String, text : String) : {Hash(String, String), String}
   convention = Apropos::Convention.parse("docs/conventions/#{name}", text)
   slug, content = Apropos::Skills.wrappers([convention]).first
-  {"/repo/.claude/skills/#{slug}/SKILL.md", content}
+  paths = Apropos::Skills::ROOTS.each_with_object({} of String => String) do |root, hash|
+    hash[ROOT.join(root, slug, "SKILL.md").to_s] = content
+  end
+  {paths, content}
 end
 
 describe Apropos::Lint do
@@ -81,8 +85,8 @@ describe Apropos::Lint do
   it "warns on a skill doc over the line budget" do
     body = String.build { |io| (Apropos::Lint::SKILL_DOC_MAX + 1).times { io << "line\n" } }
     text = "---\nskill: true\ndescription: \"Use when big\"\n---\n#{body}"
-    location, content = wrapper_for("big.md", text)
-    fs = InMemoryFS.new({doc("big.md") => text, location => content})
+    wrappers, _ = wrapper_for("big.md", text)
+    fs = InMemoryFS.new(wrappers.merge({doc("big.md") => text}))
     code, stdout = run_lint(fs)
     code.should eq(0)
     stdout.should contain("skill doc is over")
@@ -110,8 +114,10 @@ describe Apropos::Lint do
 
     it "errors on a stale wrapper" do
       text = "---\nskill: true\ndescription: \"Use when w\"\n---\n# W\n\nb\n"
-      location, _ = wrapper_for("workflows/w.md", text)
-      fs = InMemoryFS.new({doc("workflows/w.md") => text, location => "hand edited\n"})
+      wrappers, _ = wrapper_for("workflows/w.md", text)
+      seed = wrappers.merge({doc("workflows/w.md") => text})
+      seed[wrappers.keys.first] = "hand edited\n"
+      fs = InMemoryFS.new(seed)
       code, stdout = run_lint(fs)
       code.should eq(1)
       stdout.should contain("stale generated wrapper")
@@ -119,11 +125,18 @@ describe Apropos::Lint do
 
     it "accepts an up-to-date wrapper" do
       text = "---\nskill: true\ndescription: \"Use when w\"\n---\n# W\n\nb\n"
-      location, content = wrapper_for("workflows/w.md", text)
-      fs = InMemoryFS.new({doc("workflows/w.md") => text, location => content})
+      wrappers, _ = wrapper_for("workflows/w.md", text)
+      fs = InMemoryFS.new(wrappers.merge({doc("workflows/w.md") => text}))
       code, stdout = run_lint(fs)
       code.should eq(0)
       stdout.should contain("lint: clean")
+    end
+
+    it "errors on an orphaned wrapper in the gemini skills root too" do
+      fs = InMemoryFS.new({"/repo/.gemini/skills/ghost/SKILL.md" => "orphan\n"})
+      code, stdout = run_lint(fs)
+      code.should eq(1)
+      stdout.should contain(".gemini/skills/ghost/SKILL.md: orphaned generated wrapper")
     end
 
     it "errors on an orphaned wrapper with no source doc" do

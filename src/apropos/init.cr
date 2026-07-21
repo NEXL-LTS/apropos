@@ -11,10 +11,18 @@ module Apropos
   # prints what would change and writes nothing.
   #
   # Per-tool hook wiring (Claude Code's `.claude/settings.json`, OpenCode's
-  # generated plugin) is tool-agnostic: pass `--tool claude` / `--tool
-  # opencode` (repeatable) to wire specific agents explicitly, or omit `--tool`
-  # entirely to auto-detect by probing PATH for each supported agent. This
-  # keeps init easy to extend as more agents (Gemini CLI, Codex, ...) land.
+  # generated plugin, Gemini CLI's `.gemini/settings.json`) is tool-agnostic:
+  # pass `--tool claude` / `--tool opencode` / `--tool gemini` (repeatable) to
+  # wire specific agents explicitly, or omit `--tool` entirely to auto-detect
+  # by probing PATH for each supported agent. This keeps init easy to extend as
+  # more agents (Codex, ...) land.
+  #
+  # Gemini CLI's hook system has no pre-edit context-injection event (its
+  # `BeforeTool` output schema only supports overriding tool arguments or
+  # blocking the call — see `merge_gemini_settings`), so both Layer 2 and
+  # Layer 3 are wired onto its `AfterTool` event. Layer 2 still fires, just
+  # after the edit instead of before it — the same timing degradation
+  # `doctor.cr` already documents for older Claude Code versions.
   #
   # init is an authoring command, so it fails **closed**: a malformed existing
   # `settings.json` is an error, not a silent overwrite.
@@ -25,8 +33,12 @@ module Apropos
     end
 
     # CLI agents init knows how to wire hooks for. Extend this set as more
-    # emitters land (Gemini CLI, Codex, GitHub Copilot CLI, Cursor CLI, ...).
-    KNOWN_TOOLS = Set{"claude", "opencode"}
+    # emitters land (Codex, GitHub Copilot CLI, Cursor CLI, ...).
+    KNOWN_TOOLS = Set{"claude", "opencode", "gemini"}
+
+    # The context filename apropos points Gemini CLI at, so Layer 1 reads the
+    # same root file Claude Code and OpenCode do without needing a symlink.
+    GEMINI_CONTEXT_FILENAME = "AGENTS.md"
 
     # Parsed flags for one `init` invocation. `tools: nil` means auto-detect;
     # a non-nil set (from one or more `--tool`) is used verbatim, ignoring PATH.
@@ -58,6 +70,7 @@ module Apropos
       write_examples(repo_root, fs, options, stdout) if options.example
       link_claude(repo_root, fs, options, stdout) if options.claude_symlink
       scaffold_opencode(repo_root, fs, options, stdout) if tools.includes?("opencode")
+      merge_gemini_settings(repo_root, fs, options, stdout) if tools.includes?("gemini")
       stdout.puts NEXT_STEPS_HINT unless options.dry_run
       0
     rescue ex : Apropos::Error
@@ -144,7 +157,7 @@ module Apropos
     # settings object, preserving every other key and hook and adding a group
     # only when apropos's own command is not already wired for that event.
     private def merged_settings(existing : String?) : String
-      root = settings_root(existing)
+      root = settings_root(existing, ".claude/settings.json")
       hooks = (root["hooks"]?.try(&.as_h?)).try(&.dup) || {} of String => JSON::Any
       {"PreToolUse" => "pre", "PostToolUse" => "post"}.each do |event, sub|
         groups = (hooks[event]?.try(&.as_a?)).try(&.dup) || [] of JSON::Any
@@ -155,16 +168,16 @@ module Apropos
       JSON::Any.new(root).to_pretty_json + "\n"
     end
 
-    private def settings_root(existing : String?) : Hash(String, JSON::Any)
+    private def settings_root(existing : String?, label : String) : Hash(String, JSON::Any)
       return {} of String => JSON::Any if existing.nil?
       parsed =
         begin
           JSON.parse(existing)
         rescue ex : JSON::ParseException
-          raise Error.new("existing .claude/settings.json is not valid JSON: #{ex.message}")
+          raise Error.new("existing #{label} is not valid JSON: #{ex.message}")
         end
       hash = parsed.as_h?
-      raise Error.new(".claude/settings.json must be a JSON object") if hash.nil?
+      raise Error.new("#{label} must be a JSON object") if hash.nil?
       hash.dup
     end
 
@@ -213,6 +226,165 @@ module Apropos
       path = repo_root.join(".opencode", "plugins", "apropos.js").to_s
       existing = fs.read?(path)
       sync(fs, options, stdout, path, OPENCODE_PLUGIN_JS, existing, ".opencode/plugins/apropos.js")
+    end
+
+    # Write (or merge into) `.gemini/settings.json`: Gemini CLI's `AfterTool`
+    # event is the only one whose output schema supports injecting text back
+    # into the model's context (`hookSpecificOutput.additionalContext`) — its
+    # `BeforeTool` event can only override tool arguments or block the call.
+    # So both `apropos hook pre` (Layer 2) and `apropos hook post` (Layer 3)
+    # run there, matched on Gemini's file-editing tools (`write_file`,
+    # `replace`); `Hook.pre`'s Layer 2 matching only needs the edited file's
+    # path, which `AfterTool`'s payload still carries, so Layer 2 rules still
+    # fire — just after the edit rather than before it. `apropos hook pre`
+    # also runs there matched on `read_file` alone, so Layer 2 can land on
+    # the model's first read instead of only once it (mis)writes there. Also
+    # points Gemini's configurable context filename at `AGENTS.md`, so Layer
+    # 1 needs no symlink the way Claude's CLAUDE.md does.
+    private def merge_gemini_settings(repo_root : Path, fs : Filesystem, options : Options, stdout : IO) : Nil
+      path = repo_root.join(".gemini", "settings.json").to_s
+      existing = fs.read?(path)
+      sync(fs, options, stdout, path, merged_gemini_settings(existing), existing, ".gemini/settings.json")
+    end
+
+    private def merged_gemini_settings(existing : String?) : String
+      root = settings_root(existing, ".gemini/settings.json")
+      hooks = (root["hooks"]?.try(&.as_h?)).try(&.dup) || {} of String => JSON::Any
+      groups = (hooks["AfterTool"]?.try(&.as_a?)).try(&.dup) || [] of JSON::Any
+      groups = ensure_gemini_group(groups)
+      groups = ensure_gemini_read_group(groups)
+      hooks["AfterTool"] = JSON::Any.new(groups)
+      root["hooks"] = JSON::Any.new(hooks)
+      root["context"] = merged_gemini_context(root["context"]?)
+      JSON::Any.new(root).to_pretty_json + "\n"
+    end
+
+    # Converge to fully wired even when a prior run (or a hand-edit) left only
+    # one of the two commands present: add the missing command(s) into the
+    # existing apropos-owned group rather than skipping just because *a*
+    # apropos command is already there, so a half-wired repo self-heals on
+    # re-run instead of needing a manual JSON edit. Matching stays on the
+    # generic "does this group carry an apropos command" predicate (not the
+    # matcher) so a user's own customization of the matcher (e.g. widening
+    # it to cover another tool) still gets healed in place rather than
+    # spawning a second, default-matcher group alongside it.
+    #
+    # `ensure_gemini_read_group`'s read-only group is explicitly excluded,
+    # though: it is also apropos-owned and also carries `apropos hook pre`,
+    # so the generic predicate alone can't tell the two groups apart — and if
+    # it ran first (before this method's own group exists, e.g. from a
+    # hand-edit with only that group present), it would be the first match
+    # and get "healed" with `apropos hook post` too, wiring Layer 3 onto
+    # `read_file` and leaving the intended write/edit group never created.
+    private def ensure_gemini_group(groups : Array(JSON::Any)) : Array(JSON::Any)
+      index = groups.index { |group| apropos_group?(group) && !gemini_read_group?(group) }
+      return groups + [gemini_apropos_group] if index.nil?
+
+      groups = groups.dup
+      groups[index] = with_missing_gemini_hooks(groups[index])
+      groups
+    end
+
+    private def gemini_read_group?(group : JSON::Any) : Bool
+      group.as_h?.try(&.["matcher"]?).try(&.as_s?) == "read_file"
+    end
+
+    # Also refreshes an already-present command's `timeout` to the current
+    # `gemini_hook` shape, not just appends missing ones — so a repo that
+    # ran `init` before the ms-vs-seconds timeout fix actually picks it up
+    # on the next `init`, instead of staying stuck on the stale value
+    # forever (only the delivery mechanism's own healing can fix this; the
+    # settings file itself gives no other signal that the value is stale).
+    private def with_missing_gemini_hooks(group : JSON::Any) : JSON::Any
+      hash = group.as_h.dup
+      present = hash["hooks"]?.try(&.as_a?) || [] of JSON::Any
+      refreshed = present.map do |hook|
+        command = hook.as_h?.try(&.["command"]?).try(&.as_s?)
+        command && GEMINI_HOOK_COMMANDS.includes?(command) ? gemini_hook(command) : hook
+      end
+      commands = present.compact_map { |hook| hook.as_h?.try(&.["command"]?).try(&.as_s?) }
+      missing = GEMINI_HOOK_COMMANDS.reject { |command| commands.includes?(command) }
+      hash["hooks"] = JSON::Any.new(refreshed + missing.map { |command| gemini_hook(command) })
+      JSON::Any.new(hash)
+    end
+
+    # A second, independent group matched on `read_file` alone, carrying only
+    # `apropos hook pre` — kept separate from `ensure_gemini_group`'s
+    # write_file|replace group (rather than reusing its "does *any* apropos
+    # command already exist" check) because that check would see
+    # `apropos hook pre` already present in the *write* group and never add
+    # this one. Matcher-keyed instead: find (or create) the group whose
+    # matcher is exactly "read_file", and ensure it has the command — and,
+    # same as `with_missing_gemini_hooks`, refresh it if already present
+    # rather than no-op'ing, so a stale `timeout` here converges too instead
+    # of getting stuck forever once the command already exists.
+    private def ensure_gemini_read_group(groups : Array(JSON::Any)) : Array(JSON::Any)
+      index = groups.index { |group| gemini_read_group?(group) }
+      return groups + [gemini_read_group] if index.nil?
+
+      groups = groups.dup
+      groups[index] = with_missing_gemini_read_hook(groups[index])
+      groups
+    end
+
+    private def with_missing_gemini_read_hook(group : JSON::Any) : JSON::Any
+      hash = group.as_h.dup
+      present = hash["hooks"]?.try(&.as_a?) || [] of JSON::Any
+      refreshed = present.map do |hook|
+        hook.as_h?.try(&.["command"]?).try(&.as_s?) == "apropos hook pre" ? gemini_hook("apropos hook pre") : hook
+      end
+      has_pre = refreshed.any? { |hook| hook.as_h?.try(&.["command"]?).try(&.as_s?) == "apropos hook pre" }
+      hash["hooks"] = JSON::Any.new(has_pre ? refreshed : refreshed + [gemini_hook("apropos hook pre")])
+      JSON::Any.new(hash)
+    end
+
+    private def gemini_read_group : JSON::Any
+      JSON::Any.new({
+        "matcher" => JSON::Any.new("read_file"),
+        "hooks"   => JSON::Any.new([gemini_hook("apropos hook pre")]),
+      })
+    end
+
+    # Add `AGENTS.md` to `context.fileName` (creating it as a one-element
+    # array if absent), preserving every other filename a user already listed.
+    private def merged_gemini_context(existing : JSON::Any?) : JSON::Any
+      context = (existing.try(&.as_h?)).try(&.dup) || {} of String => JSON::Any
+      names = context["fileName"]?
+      list = names.try(&.as_a?) || names.try { |name| [name] } || [] of JSON::Any
+      unless list.any? { |name| name.as_s? == GEMINI_CONTEXT_FILENAME }
+        list = list + [JSON::Any.new(GEMINI_CONTEXT_FILENAME)]
+      end
+      context["fileName"] = JSON::Any.new(list)
+      JSON::Any.new(context)
+    end
+
+    GEMINI_HOOK_COMMANDS = ["apropos hook pre", "apropos hook post"]
+
+    # Gemini CLI's hook `timeout` is passed straight to JS `setTimeout()` —
+    # milliseconds, not seconds like Claude Code's own hook `timeout`
+    # (`APROPOS_HOOK_PREFIX`'s callers above use a raw `10` for Claude,
+    # correctly meaning 10 seconds there). Using the same literal `10` here
+    # previously gave Gemini's AfterTool hooks a 10-*millisecond* budget,
+    # well under the ~3-4ms `apropos` itself needs just to spawn — any load
+    # at all (e.g. another CLI agent running concurrently) tips it over, so
+    # `apropos hook pre`/`post` would intermittently get SIGTERM'd and
+    # reported as failed. 10_000ms is the same 10-second intent, expressed
+    # in Gemini's own unit.
+    GEMINI_HOOK_TIMEOUT = 10_000_i64
+
+    private def gemini_apropos_group : JSON::Any
+      JSON::Any.new({
+        "matcher" => JSON::Any.new("write_file|replace"),
+        "hooks"   => JSON::Any.new(GEMINI_HOOK_COMMANDS.map { |command| gemini_hook(command) }),
+      })
+    end
+
+    private def gemini_hook(command : String) : JSON::Any
+      JSON::Any.new({
+        "type"    => JSON::Any.new("command"),
+        "command" => JSON::Any.new(command),
+        "timeout" => JSON::Any.new(GEMINI_HOOK_TIMEOUT),
+      })
     end
 
     # Alias CLAUDE.md → AGENTS.md so the same Layer 1 file serves both loaders.
@@ -274,7 +446,10 @@ module Apropos
       Claude Code delivers Layer 2 via PreToolUse `additionalContext`; run
       `apropos doctor` to verify the version. OpenCode delivers Layer 2 via
       `tool.execute.before` and Layer 3 via `tool.execute.after`, injecting
-      context with `noReply: true` through the generated plugin.
+      context with `noReply: true` through the generated plugin. Gemini CLI has
+      no pre-edit context-injection event, so both Layer 2 and Layer 3 deliver
+      via its `AfterTool` hook instead — Layer 2 still fires, just after the
+      edit rather than before it.
       MD
 
     AGENTS_SKELETON = <<-MD

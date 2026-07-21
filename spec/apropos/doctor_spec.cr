@@ -164,6 +164,62 @@ describe Apropos::Doctor do
     end
   end
 
+  describe "gemini check" do
+    it "is ok (skipped) when gemini is not on PATH" do
+      _, stdout = run_doctor(InMemoryFS.new, FakeEnv.new)
+      stdout.should contain("gemini: not on PATH; skipped hook check")
+    end
+
+    it "warns when gemini is on PATH but settings.json is absent" do
+      env = FakeEnv.new(present: {"gemini" => "/usr/bin/gemini"})
+      _, stdout = run_doctor(InMemoryFS.new, env)
+      stdout.should contain("warn  gemini: .gemini/settings.json absent")
+    end
+
+    it "warns when settings.json is not valid JSON" do
+      env = FakeEnv.new(present: {"gemini" => "/usr/bin/gemini"})
+      fs = InMemoryFS.new({"/repo/.gemini/settings.json" => "{not json"})
+      _, stdout = run_doctor(fs, env)
+      stdout.should contain("gemini: .gemini/settings.json is not valid JSON")
+    end
+
+    it "warns when the AfterTool hook is absent" do
+      env = FakeEnv.new(present: {"gemini" => "/usr/bin/gemini"})
+      fs = InMemoryFS.new({"/repo/.gemini/settings.json" => %({"hooks":{}})})
+      _, stdout = run_doctor(fs, env)
+      stdout.should contain("warn  gemini: AfterTool hook absent")
+    end
+
+    it "warns when only one of pre/post is wired under AfterTool" do
+      env = FakeEnv.new(present: {"gemini" => "/usr/bin/gemini"})
+      only_pre = %({"hooks":{"AfterTool":[{"hooks":[{"type":"command","command":"apropos hook pre"}]}]}})
+      fs = InMemoryFS.new({"/repo/.gemini/settings.json" => only_pre})
+      _, stdout = run_doctor(fs, env)
+      stdout.should contain("warn  gemini: AfterTool hook absent")
+    end
+
+    it "is ok when gemini is on PATH and both hooks are wired" do
+      env = FakeEnv.new(present: {"gemini" => "/usr/bin/gemini"})
+      wired = %({"hooks":{"AfterTool":[{"hooks":[) +
+              %({"type":"command","command":"apropos hook pre"},) +
+              %({"type":"command","command":"apropos hook post"}]}]}})
+      fs = InMemoryFS.new({"/repo/.gemini/settings.json" => wired})
+      _, stdout = run_doctor(fs, env)
+      stdout.should contain("ok    gemini: AfterTool hook wired")
+    end
+
+    it "warns when pre and post are split across two different groups, not both in one" do
+      env = FakeEnv.new(present: {"gemini" => "/usr/bin/gemini"})
+      split = %({"hooks":{"AfterTool":[) +
+              %({"matcher":"read_file","hooks":[{"type":"command","command":"apropos hook pre"}]},) +
+              %({"matcher":"write_file|replace","hooks":[{"type":"command","command":"apropos hook post"}]}) +
+              %(]}})
+      fs = InMemoryFS.new({"/repo/.gemini/settings.json" => split})
+      _, stdout = run_doctor(fs, env)
+      stdout.should contain("warn  gemini: AfterTool hook absent")
+    end
+  end
+
   describe "index check" do
     it "warns when the index is missing" do
       _, stdout = run_doctor(InMemoryFS.new, FakeEnv.new)

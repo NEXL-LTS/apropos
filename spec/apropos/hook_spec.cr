@@ -253,4 +253,31 @@ describe Apropos::Hook do
       stdout.should contain("Convention (docs/conventions/db.md):")
     end
   end
+
+  # Gemini CLI wires both `hook pre` and `hook post` onto its single
+  # `AfterTool` event (its `BeforeTool` output schema cannot inject context —
+  # see init.cr). Its `write_file`/`replace` tools use the exact same
+  # `file_path`/`content`/`old_string`/`new_string` argument names Claude's
+  # `Write`/`Edit` do, so this runtime needs no Gemini-specific code — these
+  # cases lock that finding in against a regression.
+  describe "Gemini CLI payload shapes (no tool_name gating)" do
+    it "matches a Layer 2 rule from a write_file AfterTool payload" do
+      fs = InMemoryFS.new({A_PATH => A_DOC})
+      input = %({"session_id":"s","hook_event_name":"AfterTool","tool_name":"write_file",) +
+              %("cwd":"/repo","tool_input":{"file_path":"src/app.cr","content":"puts 1"}})
+      code, stdout = invoke(:pre, input, fs)
+      code.should eq(0)
+      stdout.should contain("Convention (docs/conventions/a.md):")
+    end
+
+    it "matches a Layer 3 rule from a replace AfterTool payload" do
+      fs = InMemoryFS.new({DB_PATH => DB_DOC})
+      input = %({"session_id":"s","hook_event_name":"AfterTool","tool_name":"replace",) +
+              %("cwd":"/repo","tool_input":{"file_path":"lib/x.cr","old_string":"noop",) +
+              %("new_string":"db.transaction do"}})
+      code, stdout = invoke(:post, input, fs)
+      code.should eq(0)
+      stdout.should contain("Convention (docs/conventions/db.md):")
+    end
+  end
 end
