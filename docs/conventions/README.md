@@ -60,9 +60,12 @@ its path or content ("doing a data migration", "touching billing"). The doc live
 in `docs/conventions/workflows/` and opts in via `skill: true` + a `description:`
 starting with "Use when…". Skills are **generated, not hand-written**: `apropos
 generate` emits a thin `.claude/skills/<slug>/SKILL.md` wrapper (description +
-pointer to the source doc). Never edit a wrapper — edit the source doc. Keep skill
-docs under 500 lines; split large workflows. Semantic triggering has a miss rate,
-so anything that *must* always apply cannot live only here.
+pointer to the source doc) — or, when `conventions_dir` (see below) points
+outside the repo, the doc's full body inlined instead, since a model can't be
+relied on to follow a pointer to a path outside its own workspace tree. Never
+edit a wrapper — edit the source doc. Keep skill docs under 500 lines; split
+large workflows. Semantic triggering has a miss rate, so anything that *must*
+always apply cannot live only here.
 
 ## Frontmatter
 
@@ -115,6 +118,11 @@ cached **trigger index** (`.cache/apropos/index.json`, gitignored, rebuilt only
 when a doc's hash changes) and the committed **skill wrappers**. `apropos generate
 --check` is the CI gate: it fails if the committed wrappers drift from what the
 current docs produce, so a stale or hand-edited `SKILL.md` blocks the merge.
+
+`docs/conventions/` is the default location, not a hardcoded one: an
+`apropos.yml` at the repo root can set `conventions_dir` to any other path,
+relative or absolute, in or out of the repo (see the root [`README.md`](../../README.md#configuration)).
+Every command above resolves it the same way.
 
 The same frontmatter doubles as a **review manifest**: `apropos review` resolves
 which conventions apply to a diff exactly as the edit-time hooks do — path-match

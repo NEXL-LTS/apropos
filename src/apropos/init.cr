@@ -2,6 +2,7 @@ require "json"
 require "./errors"
 require "./filesystem"
 require "./environment"
+require "./config"
 
 module Apropos
   # `apropos init`: bootstrap the convention structure into a repo.
@@ -98,8 +99,9 @@ module Apropos
     end
 
     private def scaffold(repo_root : Path, fs : Filesystem, options : Options, stdout : IO) : Nil
-      create(repo_root, fs, options, stdout, "docs/conventions/README.md", CONVENTIONS_README)
-      create(repo_root, fs, options, stdout, "docs/conventions/workflows/.gitkeep", "")
+      conventions = conventions_relative(repo_root, fs)
+      create(repo_root, fs, options, stdout, "#{conventions}/README.md", CONVENTIONS_README)
+      create(repo_root, fs, options, stdout, "#{conventions}/workflows/.gitkeep", "")
       create(repo_root, fs, options, stdout, ".claude/skills/.gitkeep", SKILLS_GITKEEP)
       # The root file is the user's own Layer 1 content — never overwrite it, even
       # under --force; only scaffold it when absent.
@@ -107,9 +109,19 @@ module Apropos
     end
 
     private def write_examples(repo_root : Path, fs : Filesystem, options : Options, stdout : IO) : Nil
-      create(repo_root, fs, options, stdout, "docs/conventions/example-path-rule.md", EXAMPLE_L2)
-      create(repo_root, fs, options, stdout, "docs/conventions/example-content-rule.md", EXAMPLE_L3)
-      create(repo_root, fs, options, stdout, "docs/conventions/workflows/example-skill.md", EXAMPLE_SKILL)
+      conventions = conventions_relative(repo_root, fs)
+      create(repo_root, fs, options, stdout, "#{conventions}/example-path-rule.md", EXAMPLE_L2)
+      create(repo_root, fs, options, stdout, "#{conventions}/example-content-rule.md", EXAMPLE_L3)
+      create(repo_root, fs, options, stdout, "#{conventions}/workflows/example-skill.md", EXAMPLE_SKILL)
+    end
+
+    # The conventions directory, relative to `repo_root` (with `../` segments
+    # when `apropos.yml` points outside it) — `create`'s single relative-path
+    # parameter needs this rather than the resolved absolute `Path` `Config`
+    # returns, since it both derives the write location (joined back onto
+    # `repo_root`) and the printed display string from the same value.
+    private def conventions_relative(repo_root : Path, fs : Filesystem) : String
+      Config.conventions_dir(repo_root, fs).relative_to(repo_root).to_posix.to_s
     end
 
     # Write a scaffold file when absent (or when `--force` and `force_allowed`),

@@ -2,6 +2,7 @@ require "digest/sha256"
 require "./frontmatter"
 require "./matcher"
 require "./filesystem"
+require "./config"
 
 module Apropos
   # One parsed convention doc: its repo-relative path, a content hash
@@ -87,10 +88,8 @@ module Apropos
   module Conventions
     extend self
 
-    CONVENTIONS_DIR = "docs/conventions"
-
     def walk(repo_root : Path, fs : Filesystem = Filesystem::Real.new) : Array(Convention)
-      base = repo_root.join(CONVENTIONS_DIR)
+      base = Config.conventions_dir(repo_root, fs)
       fs.glob(base, "**/*.md").sort.map do |absolute|
         Convention.parse(relativize(repo_root, absolute), fs.read(absolute))
       end

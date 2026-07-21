@@ -31,6 +31,32 @@ describe Apropos::Skills do
         SKILL
     end
 
+    it "inlines the doc body instead of a pointer when the source lives outside the repo" do
+      conventions = [convention("../shared-conventions/workflows/foo.md",
+        %(skill: true\ndescription: "Use when foo"))]
+
+      wrapper = Apropos::Skills.wrappers(conventions)["foo"]
+      wrapper.should_not contain("Read `")
+      wrapper.should contain("body")
+    end
+
+    it "inlines the body's exact bytes, not stripped, when the source lives outside the repo" do
+      text = "---\nskill: true\ndescription: \"Use when foo\"\n---\n# Foo\n\ncontent line   \n\n\n"
+      body = Apropos::Frontmatter.split(text)[1]
+      conventions = [Apropos::Convention.parse("../shared-conventions/workflows/foo.md", text)]
+
+      wrapper = Apropos::Skills.wrappers(conventions)["foo"]
+      wrapper.should end_with(body)
+    end
+
+    it "appends a trailing newline when inlining a body that lacks one" do
+      text = "---\nskill: true\ndescription: \"Use when foo\"\n---\nno trailing newline"
+      conventions = [Apropos::Convention.parse("../shared-conventions/workflows/foo.md", text)]
+
+      wrapper = Apropos::Skills.wrappers(conventions)["foo"]
+      wrapper.should end_with("no trailing newline\n")
+    end
+
     it "ignores docs without skill: true" do
       conventions = [
         convention("docs/conventions/a.md", %(paths: ["src/**"])),

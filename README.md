@@ -184,6 +184,24 @@ trigger index and committed skill wrappers. At edit time, the hooks look up the
 matching rules and inject them. For review, the same frontmatter resolves which
 conventions apply to a diff, so review prompts carry zero copies of the rules.
 
+## Configuration
+
+Conventions live in `docs/conventions/` by default — nothing to configure for
+the common case. To keep them somewhere else (a monorepo's docs shared across
+packages, for instance), drop an `apropos.yml` at the repo root:
+
+```yaml
+conventions_dir: ../shared-conventions   # relative to repo root, or absolute
+```
+
+Every command that reads conventions (`generate`, `hook`, `lint`, `match`,
+`review`) and `init`'s own scaffolding follow this. Layer 2/3 hook delivery
+works identically regardless of where the docs live. Layer 4 skill wrappers
+inline the doc's full body instead of the usual lightweight pointer whenever
+the source resolves outside the repo — a model can't be relied on to follow a
+pointer to a path outside its own workspace tree, so the wrapper carries the
+content directly instead.
+
 ## Commands
 
 | Command | Purpose |

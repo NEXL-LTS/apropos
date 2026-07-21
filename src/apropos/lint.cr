@@ -1,6 +1,7 @@
 require "./errors"
 require "./frontmatter"
 require "./conventions"
+require "./config"
 require "./matcher"
 require "./skills"
 require "./filesystem"
@@ -13,8 +14,7 @@ module Apropos
   module Lint
     extend self
 
-    CONVENTIONS_DIR = "docs/conventions"
-    ROOT_FILES      = {"AGENTS.md", "CLAUDE.md"}
+    ROOT_FILES = {"AGENTS.md", "CLAUDE.md"}
 
     # Line budgets: a root file over 150 lines or a skill doc over 500
     # lines is a warning (`--strict` promotes warnings to errors).
@@ -25,8 +25,14 @@ module Apropos
     # `--strict` promotes it.
     record Finding, severity : Symbol, location : String, message : String
 
+    # `Config::Error` (a malformed `apropos.yml`) propagates here uncaught
+    # elsewhere in this module — lint is an authoring/CI command, so it fails
+    # *closed* on it just like a malformed convention doc.
     def run(repo_root : Path, fs : Filesystem, strict : Bool, stdout : IO, stderr : IO) : Int32
       report(collect(repo_root, fs), strict, stdout)
+    rescue ex : Apropos::Error
+      stderr.puts "apropos lint: #{ex.message}"
+      1
     end
 
     private def collect(repo_root : Path, fs : Filesystem) : Array(Finding)
@@ -42,7 +48,7 @@ module Apropos
     private def parse_docs(repo_root : Path, fs : Filesystem) : {Array(Convention), Array(Finding)}
       conventions = [] of Convention
       findings = [] of Finding
-      fs.glob(repo_root.join(CONVENTIONS_DIR), "**/*.md").sort.each do |absolute|
+      fs.glob(Config.conventions_dir(repo_root, fs), "**/*.md").sort.each do |absolute|
         relative = Path[absolute].relative_to(repo_root).to_posix.to_s
         begin
           conventions << Convention.parse(relative, fs.read(absolute))
@@ -121,7 +127,8 @@ module Apropos
         begin
           Skills.wrappers(skill_docs)
         rescue ex : Skills::Error
-          return [Finding.new(:error, CONVENTIONS_DIR, ex.message.to_s)]
+          location = Config.conventions_dir(repo_root, fs).relative_to(repo_root).to_posix.to_s
+          return [Finding.new(:error, location, ex.message.to_s)]
         end
 
       findings = [] of Finding

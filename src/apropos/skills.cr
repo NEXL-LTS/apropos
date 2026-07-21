@@ -4,10 +4,16 @@ require "./conventions"
 module Apropos
   # Skill wrapper generation: for every `skill: true` doc, emit a
   # `.claude/skills/<slug>/SKILL.md` whose frontmatter carries the doc's `name`
-  # (its slug) and `description` verbatim, and whose body is a generated banner
-  # plus a pointer back to the source doc. The wrappers are the one *committed*
-  # generated artifact, so their bytes must be stable — the `--check`
-  # gate byte-compares them.
+  # (its slug) and `description` verbatim, and whose body is a generated
+  # banner plus a pointer back to the source doc — or, when the source lives
+  # outside the repo (a custom `conventions_dir`, e.g. `../shared-docs`), the
+  # doc's full body inlined instead. A pointer this thin only works if the
+  # model actually follows it; that's reliable for a normal in-repo path (it
+  # looks like anything else in the project) but was observed *not* to be for
+  # an external one with `../` segments outside the visible workspace tree —
+  # the model has no reason to trust or prioritize reading it. The wrappers
+  # are the one *committed* generated artifact, so their bytes must be
+  # stable — the `--check` gate byte-compares them.
   module Skills
     extend self
 
@@ -60,8 +66,20 @@ module Apropos
         io << YAML.dump({"name" => slug, "description" => description})
         io << "---\n\n"
         io << BANNER << "\n\n"
-        io << "Read `" << convention.path << "` and follow it.\n"
+        if escapes_repo?(convention.path)
+          body = convention.body
+          io << body
+          io << "\n" unless body.ends_with?("\n")
+        else
+          io << "Read `" << convention.path << "` and follow it.\n"
+        end
       end
+    end
+
+    # Whether a convention's repo-relative path climbs out of the repo (a
+    # `../`-leading path — only possible via a custom `conventions_dir`).
+    private def escapes_repo?(path : String) : Bool
+      Path.posix(path).parts.first? == ".."
     end
   end
 end
