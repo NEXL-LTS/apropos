@@ -67,7 +67,9 @@ module Apropos
         io << "---\n\n"
         io << BANNER << "\n\n"
         if escapes_repo?(convention.path)
-          io << convention.body.strip << "\n"
+          body = convention.body
+          io << body
+          io << "\n" unless body.ends_with?("\n")
         else
           io << "Read `" << convention.path << "` and follow it.\n"
         end
