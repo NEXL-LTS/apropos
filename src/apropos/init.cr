@@ -263,14 +263,30 @@ module Apropos
     # one of the two commands present: add the missing command(s) into the
     # existing apropos-owned group rather than skipping just because *a*
     # apropos command is already there, so a half-wired repo self-heals on
-    # re-run instead of needing a manual JSON edit.
+    # re-run instead of needing a manual JSON edit. Matching stays on the
+    # generic "does this group carry an apropos command" predicate (not the
+    # matcher) so a user's own customization of the matcher (e.g. widening
+    # it to cover another tool) still gets healed in place rather than
+    # spawning a second, default-matcher group alongside it.
+    #
+    # `ensure_gemini_read_group`'s read-only group is explicitly excluded,
+    # though: it is also apropos-owned and also carries `apropos hook pre`,
+    # so the generic predicate alone can't tell the two groups apart — and if
+    # it ran first (before this method's own group exists, e.g. from a
+    # hand-edit with only that group present), it would be the first match
+    # and get "healed" with `apropos hook post` too, wiring Layer 3 onto
+    # `read_file` and leaving the intended write/edit group never created.
     private def ensure_gemini_group(groups : Array(JSON::Any)) : Array(JSON::Any)
-      index = groups.index { |group| apropos_group?(group) }
+      index = groups.index { |group| apropos_group?(group) && !gemini_read_group?(group) }
       return groups + [gemini_apropos_group] if index.nil?
 
       groups = groups.dup
       groups[index] = with_missing_gemini_hooks(groups[index])
       groups
+    end
+
+    private def gemini_read_group?(group : JSON::Any) : Bool
+      group.as_h?.try(&.["matcher"]?).try(&.as_s?) == "read_file"
     end
 
     # Also refreshes an already-present command's `timeout` to the current
@@ -298,21 +314,28 @@ module Apropos
     # command already exist" check) because that check would see
     # `apropos hook pre` already present in the *write* group and never add
     # this one. Matcher-keyed instead: find (or create) the group whose
-    # matcher is exactly "read_file", and ensure it has the command.
+    # matcher is exactly "read_file", and ensure it has the command — and,
+    # same as `with_missing_gemini_hooks`, refresh it if already present
+    # rather than no-op'ing, so a stale `timeout` here converges too instead
+    # of getting stuck forever once the command already exists.
     private def ensure_gemini_read_group(groups : Array(JSON::Any)) : Array(JSON::Any)
-      index = groups.index { |group| group.as_h?.try(&.["matcher"]?).try(&.as_s?) == "read_file" }
+      index = groups.index { |group| gemini_read_group?(group) }
       return groups + [gemini_read_group] if index.nil?
 
-      group = groups[index]
-      hooks = group.as_h?.try(&.["hooks"]?).try(&.as_a?) || [] of JSON::Any
-      has_pre = hooks.any? { |hook| hook.as_h?.try(&.["command"]?).try(&.as_s?) == "apropos hook pre" }
-      return groups if has_pre
-
       groups = groups.dup
-      hash = group.as_h.dup
-      hash["hooks"] = JSON::Any.new(hooks + [gemini_hook("apropos hook pre")])
-      groups[index] = JSON::Any.new(hash)
+      groups[index] = with_missing_gemini_read_hook(groups[index])
       groups
+    end
+
+    private def with_missing_gemini_read_hook(group : JSON::Any) : JSON::Any
+      hash = group.as_h.dup
+      present = hash["hooks"]?.try(&.as_a?) || [] of JSON::Any
+      refreshed = present.map do |hook|
+        hook.as_h?.try(&.["command"]?).try(&.as_s?) == "apropos hook pre" ? gemini_hook("apropos hook pre") : hook
+      end
+      has_pre = refreshed.any? { |hook| hook.as_h?.try(&.["command"]?).try(&.as_s?) == "apropos hook pre" }
+      hash["hooks"] = JSON::Any.new(has_pre ? refreshed : refreshed + [gemini_hook("apropos hook pre")])
+      JSON::Any.new(hash)
     end
 
     private def gemini_read_group : JSON::Any

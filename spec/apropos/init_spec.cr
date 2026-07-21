@@ -367,6 +367,28 @@ describe Apropos::Init do
       merged.scan(%("matcher": "read_file")).size.should eq(1)
     end
 
+    it "does not mistake an existing read_file group for the write group to heal" do
+      seed = %({"hooks":{"AfterTool":[{"matcher":"read_file","hooks":) +
+             %([{"type":"command","command":"apropos hook pre","timeout":10000}]}]}})
+      fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      merged = fs.files[GEMINI_SETTINGS_PATH]
+      merged.scan(%("matcher": "read_file")).size.should eq(1)
+      merged.scan(%("matcher": "write_file|replace")).size.should eq(1)
+      read_group = merged.split(%("matcher": "write_file|replace")).first
+      read_group.should_not contain("apropos hook post")
+    end
+
+    it "refreshes a stale timeout on the read_file group's own pre command too" do
+      seed = %({"hooks":{"AfterTool":[{"matcher":"read_file","hooks":) +
+             %([{"type":"command","command":"apropos hook pre","timeout":10}]}]}})
+      fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
+      run_init(fs, Apropos::Init::Options.new(tools: Set{"gemini"}))
+      merged = fs.files[GEMINI_SETTINGS_PATH]
+      merged.should_not contain(%("timeout": 10,))
+      merged.scan(%("timeout": 10000)).size.should eq(3) # read's pre, write's pre, write's post
+    end
+
     it "preserves the group's matcher and a foreign hook alongside it while healing" do
       seed = %({"hooks":{"AfterTool":[{"matcher":"custom_matcher","hooks":) +
              %([{"type":"command","command":"echo hi"},) +
