@@ -124,8 +124,8 @@ rebuilds the same way.
   even a healthy round trip has been observed taking 30-60s for a bare
   no-tool-use prompt and well over 180s for a real edit-task prompt, which
   makes default e2e runs slow and unpredictable. `require_live_gemini`/
-  `run_gemini` (`helpers.bash`) are otherwise unchanged and fully working —
-  set this when you deliberately want Gemini coverage.
+  `run_gemini` (`helpers.bash`) remain fully working — set this when you
+  deliberately want Gemini coverage.
 - `E2E_MODEL=<model>` — pass a specific model to `claude -p --model` /
   `opencode run --model` / `gemini -p --model` (default: each CLI's configured
   model). Use a small model (e.g. `E2E_MODEL=claude-haiku-4-5`) for cheaper runs.

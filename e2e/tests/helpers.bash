@@ -24,8 +24,8 @@ E2E_AGENTS=(
 # has been observed taking 30-60s for a bare no-tool-use round trip and well
 # over 180s for a real edit-task prompt, which makes every default e2e run
 # slow and its pass/fail timing unpredictable. Its require_live_gemini/
-# run_gemini pair (below) is unchanged and still fully working — set
-# E2E_GEMINI=1 to include it.
+# run_gemini pair (below) remains fully working — set E2E_GEMINI=1 to
+# include it.
 if [ -n "${E2E_GEMINI:-}" ]; then
   E2E_AGENTS+=("Gemini|require_live_gemini|run_gemini")
 fi
@@ -271,7 +271,7 @@ require_live_gemini() {
   [ -f "$BATS_RUN_TMPDIR/gemini_unusable" ] && skip "gemini unusable (detected earlier)"
   if [ ! -f "$BATS_RUN_TMPDIR/gemini_auth_ok" ]; then
     local rc=0
-    echo_cmd "gemini -p \"reply with the single word READY\" --approval-mode auto_edit --skip-trust"
+    echo_cmd "timeout -k 10 60 gemini -p \"reply with the single word READY\" --approval-mode auto_edit --skip-trust"
     timeout -k 10 60 gemini -p "reply with the single word READY" --approval-mode auto_edit --skip-trust \
       >/dev/null 2>/dev/null || rc=$?
     if [ "$rc" -ne 0 ]; then
@@ -311,7 +311,7 @@ run_gemini() {  # arg: prompt
   local model_args=()
   [ -n "${E2E_MODEL:-}" ] && model_args=(--model "$E2E_MODEL")
   local rc=0
-  echo_cmd "cd $WORK && gemini -p \"$1\" --approval-mode auto_edit --skip-trust ${model_args[*]}"
+  echo_cmd "cd $WORK && timeout -k 10 300 gemini -p \"$1\" --approval-mode auto_edit --skip-trust ${model_args[*]}"
   (
     cd "$WORK" && timeout -k 10 300 gemini -p "$1" --approval-mode auto_edit --skip-trust "${model_args[@]}"
   ) >"$WORK/_gm_out.txt" 2>"$WORK/_gm_err.txt" || rc=$?
