@@ -78,8 +78,9 @@ module Apropos
     end
 
     private def write_wrappers(repo_root, fs, wrappers, stdout) : Nil
+      slugs = wrappers.keys.sort!
       Skills::ROOTS.each do |root|
-        wrappers.keys.sort!.each do |slug|
+        slugs.each do |slug|
           content = wrappers[slug]
           path = wrapper_path(repo_root, root, slug).to_s
           next if fs.read?(path) == content

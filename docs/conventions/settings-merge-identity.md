@@ -1,8 +1,8 @@
 ---
-paths: ["src/apropos/init.cr"]
+paths: ["src/apropos/init.cr", "src/apropos/doctor.cr"]
 ---
 
-# Keying a settings-merge heal by identity, not by membership
+# Keying a settings check or heal by identity, not by membership
 
 **Rule:** When healing/converging a hook group inside a per-tool settings file
 (`.claude/settings.json`, `.gemini/settings.json`), find the group to update by
@@ -29,6 +29,17 @@ for that group on re-`init`. Map over the present hooks and replace matching
 ones with the current shape, then append whatever's still missing; don't
 short-circuit once presence is confirmed.
 
+It also applies to *reading back* wiring state (`doctor`'s checks), not just
+merging it: whether a capability is actually present is a per-group question
+("does *this* group have everything it needs"), not a flattened one ("does
+the command set across every group, unioned together, have everything").
+Flattening loses which group each command came from, so two groups each
+missing something can add up to a false "fully wired" — e.g. `pre` only in
+the read-only group and `post` only in the write group unions to
+`{pre, post}` while the write group itself never fires Layer 2. Check within
+one group at a time and `any?`/`all?` across groups, never across a merged
+set of their contents.
+
 ## Verify
 
 - A new apropos-owned settings group introduced here excludes every other
@@ -37,3 +48,5 @@ short-circuit once presence is confirmed.
 - Re-running `init` against a group whose command is already present still
   refreshes that command's fields to the current shape, for every
   apropos-owned group — not just the one added most recently.
+- A wiring check reads each group's own commands and asks whether *that*
+  group is complete, rather than unioning commands across every group first.

@@ -159,8 +159,18 @@ module Apropos
       end
     end
 
-    # Whether an `AfterTool` group calls both `apropos hook pre` and `apropos
-    # hook post`. Returns nil when the settings file is not parseable JSON.
+    # Whether any single `AfterTool` group calls both `apropos hook pre` and
+    # `apropos hook post`. Returns nil when the settings file is not
+    # parseable JSON.
+    #
+    # Checked per group, not flattened across all of them: Gemini can have a
+    # second, read-only group carrying only `apropos hook pre` (see
+    # `Init#ensure_gemini_read_group`), so a flattened union of commands
+    # across every group could see both commands present overall while the
+    # write/edit group itself is missing one — e.g. `pre` only in the read
+    # group and `post` in the write group, which is a miswire (Layer 2 never
+    # fires on an edit) that a flattened check can't tell apart from being
+    # fully wired. Same principle as docs/conventions/settings-merge-identity.md.
     private def gemini_wired?(content : String) : Bool?
       parsed =
         begin
@@ -170,9 +180,11 @@ module Apropos
         end
       groups = parsed.as_h?.try(&.["hooks"]?).try(&.as_h?).try(&.["AfterTool"]?).try(&.as_a?)
       return false unless groups
-      commands = groups.compact_map(&.as_h?).flat_map { |group| group["hooks"]?.try(&.as_a?) || [] of JSON::Any }
-        .compact_map { |hook| hook.as_h?.try(&.["command"]?).try(&.as_s?) }
-      commands.includes?("apropos hook pre") && commands.includes?("apropos hook post")
+      groups.compact_map(&.as_h?).any? do |group|
+        commands = (group["hooks"]?.try(&.as_a?) || [] of JSON::Any)
+          .compact_map { |hook| hook.as_h?.try(&.["command"]?).try(&.as_s?) }
+        commands.includes?("apropos hook pre") && commands.includes?("apropos hook post")
+      end
     end
 
     private def index_check(repo_root : Path, fs : Filesystem) : Check

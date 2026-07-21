@@ -207,6 +207,17 @@ describe Apropos::Doctor do
       _, stdout = run_doctor(fs, env)
       stdout.should contain("ok    gemini: AfterTool hook wired")
     end
+
+    it "warns when pre and post are split across two different groups, not both in one" do
+      env = FakeEnv.new(present: {"gemini" => "/usr/bin/gemini"})
+      split = %({"hooks":{"AfterTool":[) +
+              %({"matcher":"read_file","hooks":[{"type":"command","command":"apropos hook pre"}]},) +
+              %({"matcher":"write_file|replace","hooks":[{"type":"command","command":"apropos hook post"}]}) +
+              %(]}})
+      fs = InMemoryFS.new({"/repo/.gemini/settings.json" => split})
+      _, stdout = run_doctor(fs, env)
+      stdout.should contain("warn  gemini: AfterTool hook absent")
+    end
   end
 
   describe "index check" do
