@@ -47,7 +47,7 @@ make install          # builds the release binary into $PREFIX/bin (default ~/.l
 ### Pinning a version in another repo's Dockerfile
 
 ```dockerfile
-ARG APROPOS_VERSION=v0.1.1
+ARG APROPOS_VERSION=v0.2.0
 
 RUN curl -fsSL "https://raw.githubusercontent.com/NEXL-LTS/apropos/${APROPOS_VERSION}/install.sh" -o /tmp/install.sh \
     && APROPOS_VERSION=${APROPOS_VERSION} APROPOS_BIN_DIR=/usr/local/bin sh /tmp/install.sh \
