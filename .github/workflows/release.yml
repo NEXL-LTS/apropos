@@ -53,9 +53,10 @@ jobs:
             || { echo "ERROR: binary is not fully static"; exit 1; }
 
       - name: Smoke test
-        run: |
-          chmod +x ${{ matrix.name }}
-          ./${{ matrix.name }} --version
+        # Crystal's compiler output is already executable (0755); skip chmod
+        # here — the binary was built by `docker run` as root, so the
+        # non-root runner user can't chmod a file it doesn't own.
+        run: ./${{ matrix.name }} --version
 
       - name: Checksum
         run: sha256sum ${{ matrix.name }} > ${{ matrix.name }}.sha256
@@ -105,23 +106,26 @@ jobs:
       # macOS has no static libc (Apple doesn't ship one), so a fully static
       # binary like the Linux legs isn't possible here. Instead, statically
       # link the third-party deps Crystal's stdlib pulls in (yaml, pcre2, the
-      # Boehm GC, libevent) via their Homebrew .a archives, so the shipped
-      # binary depends on nothing beyond macOS system frameworks — no
-      # Homebrew required on the installing machine. `PKG_CONFIG_PATH` is
-      # unset so the linker can't find Homebrew's .dylib and prefer it over
-      # the .a passed explicitly.
+      # Boehm GC, libevent — and libevent's own openssl dependency, pulled in
+      # transitively even though apropos never calls it) via their Homebrew
+      # .a archives, so the shipped binary depends on nothing beyond macOS
+      # system frameworks — no Homebrew required on the installing machine.
+      # `PKG_CONFIG_PATH` is unset so the linker can't find Homebrew's .dylib
+      # and prefer it over the .a passed explicitly.
       - name: Build (static third-party libs, dynamic system libs)
         run: |
           set -e
-          brew install libyaml pcre2 bdw-gc libevent
+          brew install libyaml pcre2 bdw-gc libevent openssl@3
           shards install --production
           unset PKG_CONFIG_PATH
           yaml_lib="$(brew --prefix libyaml)/lib/libyaml.a"
           pcre2_lib="$(brew --prefix pcre2)/lib/libpcre2-8.a"
           gc_lib="$(brew --prefix bdw-gc)/lib/libgc.a"
           event_lib="$(brew --prefix libevent)/lib/libevent.a"
+          ssl_lib="$(brew --prefix openssl@3)/lib/libssl.a"
+          crypto_lib="$(brew --prefix openssl@3)/lib/libcrypto.a"
           crystal build --release \
-            --link-flags "$yaml_lib $pcre2_lib $gc_lib $event_lib" \
+            --link-flags "$yaml_lib $pcre2_lib $gc_lib $event_lib $ssl_lib $crypto_lib" \
             src/apropos.cr -o ${{ matrix.name }}
 
       # Apple Silicon's kernel refuses to run an executable with no code
