@@ -15,5 +15,5 @@
       }
     }
   },
-  "postCreateCommand": "make deps && make install && crystal --version && claude --version && apropos --version"
+  "postCreateCommand": "make deps && make install && crystal --version && apropos --version && .devcontainer/install_agents.sh"
 }

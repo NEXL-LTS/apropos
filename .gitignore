@@ -17,3 +17,5 @@
 # coverage output
 /coverage/
 .cache/apropos/
+
+/.devcontainer/.env
