@@ -204,10 +204,11 @@ module Apropos
       hash.dup
     end
 
-    # Ensure some group with this exact `matcher` carries every command in
-    # `commands`, healing (refreshing present commands to the current
-    # `hook_command` shape, appending whatever's missing) when a group
-    # already exists, or appending a fresh one when none does.
+    # Ensure every command in `commands` exists in at least one group with
+    # this exact `matcher`, healing (refreshing present commands to the
+    # current `hook_command` shape, appending whatever's missing to one of
+    # them) when a group already exists, or appending a fresh one carrying
+    # all of `commands` when none does.
     #
     # Matcher-keyed, not command-ownership-keyed: `apropos hook pre` is
     # wired onto two matchers here ("Edit|Write" and "Read"), so a search
