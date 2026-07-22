@@ -61,6 +61,23 @@ jobs:
       - name: Checksum
         run: sha256sum ${{ matrix.name }} > ${{ matrix.name }}.sha256
 
+      # Exercises install.sh's real platform-detection/download/checksum/install
+      # logic end-to-end against this leg's own freshly built artifact, without
+      # needing a published release: a local file server stands in for GitHub,
+      # serving the artifact at the same relative path install.sh requests.
+      - name: Test install.sh against this artifact
+        run: |
+          set -e
+          workdir="$(mktemp -d)"
+          mkdir -p "$workdir/serve/NEXL-LTS/apropos/releases/latest/download"
+          cp ${{ matrix.name }} ${{ matrix.name }}.sha256 \
+            "$workdir/serve/NEXL-LTS/apropos/releases/latest/download/"
+          (cd "$workdir/serve" && python3 -m http.server 8080 >/dev/null 2>&1 &)
+          sleep 1
+          sed 's#https://github.com#http://127.0.0.1:8080#' install.sh > "$workdir/install.sh"
+          APROPOS_BIN_DIR="$workdir/bin" sh "$workdir/install.sh"
+          "$workdir/bin/apropos" --version
+
       - name: Upload build artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -168,6 +185,23 @@ jobs:
 
       - name: Checksum
         run: shasum -a 256 ${{ matrix.name }} > ${{ matrix.name }}.sha256
+
+      # Exercises install.sh's real platform-detection/download/checksum/install
+      # logic end-to-end against this leg's own freshly built artifact, without
+      # needing a published release: a local file server stands in for GitHub,
+      # serving the artifact at the same relative path install.sh requests.
+      - name: Test install.sh against this artifact
+        run: |
+          set -e
+          workdir="$(mktemp -d)"
+          mkdir -p "$workdir/serve/NEXL-LTS/apropos/releases/latest/download"
+          cp ${{ matrix.name }} ${{ matrix.name }}.sha256 \
+            "$workdir/serve/NEXL-LTS/apropos/releases/latest/download/"
+          (cd "$workdir/serve" && python3 -m http.server 8080 >/dev/null 2>&1 &)
+          sleep 1
+          sed 's#https://github.com#http://127.0.0.1:8080#' install.sh > "$workdir/install.sh"
+          APROPOS_BIN_DIR="$workdir/bin" sh "$workdir/install.sh"
+          "$workdir/bin/apropos" --version
 
       - name: Upload build artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
