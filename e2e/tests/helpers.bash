@@ -18,8 +18,17 @@
 E2E_AGENTS=(
   "Claude|require_live_claude|run_claude"
   "OpenCode|require_live_opencode|run_opencode"
-  "Gemini|require_live_gemini|run_gemini"
 )
+
+# Gemini CLI is opt-in, not part of the default matrix: even when healthy it
+# has been observed taking 30-60s for a bare no-tool-use round trip and well
+# over 180s for a real edit-task prompt, which makes every default e2e run
+# slow and its pass/fail timing unpredictable. Its require_live_gemini/
+# run_gemini pair (below) remains fully working — set E2E_GEMINI=1 to
+# include it.
+if [ -n "${E2E_GEMINI:-}" ]; then
+  E2E_AGENTS+=("Gemini|require_live_gemini|run_gemini")
+fi
 
 # Register the live with/without pair of tests for one layer, once per agent
 # in E2E_AGENTS. Equivalent to what `@test "..." { ... }` expands to (see
@@ -90,6 +99,21 @@ new_sample() {
   WORK="$BATS_TEST_TMPDIR/work"
   mkdir -p "$WORK"
   cp -r "$(_e2e_dir)/project/." "$WORK"/
+  # The copied apropos.yml still says `conventions_dir: ../conventions` —
+  # correct for the committed fixture (a fixed sibling of e2e/project/), but
+  # meaningless once copied into $WORK's own throwaway tmp location. Point it
+  # at an absolute path instead: the real, shared e2e/conventions/ for "with"
+  # (never copied into $WORK, so a CLI agent's own auto-included directory/
+  # file listing of its workspace can never reveal it — apropos's hooks are
+  # the only channel that can deliver it), or a directory that doesn't exist
+  # for "without" (Filesystem::Real#glob on an absent base just finds
+  # nothing, so Layer 2/3 never match and the model gets no convention
+  # content and no discoverable directory to explore, full stop).
+  if [ "$mode" = "without" ]; then
+    echo "conventions_dir: $BATS_TEST_TMPDIR/no-conventions" > "$WORK/apropos.yml"
+  else
+    echo "conventions_dir: $(_e2e_dir)/conventions" > "$WORK/apropos.yml"
+  fi
   (
     cd "$WORK" \
       && git init -q . \
@@ -105,21 +129,12 @@ new_sample() {
     rm -f "$WORK/.opencode/plugins/apropos.js"
     printf '{"hooks":{}}\n' > "$WORK/.gemini/settings.json"
     rm -rf "$WORK/.gemini/skills"
-    # Remove the convention docs themselves, not just the delivery mechanism.
-    # Without this, a sufficiently agentic model (observed with OpenCode's
-    # build agent, which readily runs `cat docs/conventions/...` on its own
-    # initiative after reading AGENTS.md's pointer to that directory) can
-    # discover the convention by direct exploration — a path that has nothing
-    # to do with apropos and would falsely fail the without-apropos control.
-    rm -f "$WORK/docs/conventions/src-rule.md" \
-          "$WORK/docs/conventions/stub-rule.md" \
-          "$WORK/docs/conventions/db-audit-rule.md" \
-          "$WORK/docs/conventions/workflows/add-operation.md"
     # Also remove the supporting module each rule points to (the decorator,
     # exception, registry, and audit wrapper). Each is a realistic project
     # convention rather than an arbitrary token, so it's a real, discoverable
-    # code artifact in its own right — leaving it in place would let the same
-    # exploration path above adopt it on its own, independent of apropos.
+    # code artifact in its own right — leaving it in place would let a
+    # sufficiently agentic model (observed with OpenCode's build agent)
+    # adopt it on its own, independent of apropos.
     rm -f "$WORK/src/telemetry.py" \
           "$WORK/scripts/errors.py" \
           "$WORK/lib/registry.py" \
@@ -246,13 +261,18 @@ run_opencode() {  # arg: prompt
 # Skip unless a real, authenticated gemini is available. Uses a run-wide
 # unusable flag so that once gemini is found unusable, later live tests skip
 # immediately instead of each paying for a failed call.
+#
+# 60s (not 30s): a bare "reply with READY" round-trip has been observed
+# taking up to ~36s on its own (cold model/connection latency, not a hang —
+# confirmed by watching it eventually succeed under a longer timeout), so 30s
+# was clipping genuine slow-but-working responses as "unauthenticated".
 require_live_gemini() {
   gemini_ready || skip "gemini not on PATH"
   [ -f "$BATS_RUN_TMPDIR/gemini_unusable" ] && skip "gemini unusable (detected earlier)"
   if [ ! -f "$BATS_RUN_TMPDIR/gemini_auth_ok" ]; then
     local rc=0
-    echo_cmd "gemini -p \"reply with the single word READY\" --approval-mode yolo"
-    timeout 30 gemini -p "reply with the single word READY" --approval-mode yolo \
+    echo_cmd "timeout -k 10 60 gemini -p \"reply with the single word READY\" --approval-mode auto_edit --skip-trust"
+    timeout -k 10 60 gemini -p "reply with the single word READY" --approval-mode auto_edit --skip-trust \
       >/dev/null 2>/dev/null || rc=$?
     if [ "$rc" -ne 0 ]; then
       touch "$BATS_RUN_TMPDIR/gemini_unusable"
@@ -265,20 +285,35 @@ require_live_gemini() {
 
 # Run gemini non-interactively in $WORK. .gemini/settings.json's AfterTool
 # hooks bridge the calls into `apropos hook pre`/`apropos hook post`; apropos
-# must be on PATH. --approval-mode yolo auto-approves file edits so a headless
-# run doesn't hang on a confirmation prompt. Plain-text output only (not
-# --output-format json): Gemini CLI has a known issue where JSON output mode
-# exits early on a non-fatal tool error, and success here only ever depends on
-# the exit code, never on parsing structured output. Stdout is written to
-# $WORK/_gm_out.txt; per Gemini's documented headless exit codes (0 success,
-# nonzero otherwise), any nonzero exit skips the test.
+# must be on PATH. --approval-mode auto_edit auto-approves edit tools so a
+# headless run doesn't hang on a confirmation prompt (matching
+# require_live_gemini's probe above). --skip-trust is required separately —
+# it is Gemini CLI's workspace-trust gate, not a tool-approval setting, and
+# every test stands up a brand-new git repo under a fresh temp dir that
+# Gemini has never seen before; without it the run blocks forever waiting for
+# an interactive trust prompt that never arrives, with a hard `timeout` below
+# as a backstop in case a future prompt type isn't covered by either flag.
+# `-k 10` forces a SIGKILL 10s after the initial SIGTERM: Node.js CLIs don't
+# always exit promptly on SIGTERM (e.g. a pending network read), and a
+# `timeout` that only sends one signal and then waits indefinitely for the
+# child to notice defeats the whole point of wrapping it in a timeout. The
+# 300s budget (not a snappier value) reflects observed reality, not a guess:
+# a bare no-tool-use prompt round-trip alone has taken up to ~36s, and a real
+# edit-task prompt (read + write, i.e. more model turns) exceeded a 180s
+# budget outright — Gemini's current latency here is just high, not hung.
+# Plain-text output only (not --output-format json): Gemini CLI has a known
+# issue where JSON output mode exits early on a non-fatal tool error, and
+# success here only ever depends on the exit code, never on parsing
+# structured output. Stdout is written to $WORK/_gm_out.txt; per Gemini's
+# documented headless exit codes (0 success, nonzero otherwise), any nonzero
+# exit skips the test.
 run_gemini() {  # arg: prompt
   local model_args=()
   [ -n "${E2E_MODEL:-}" ] && model_args=(--model "$E2E_MODEL")
   local rc=0
-  echo_cmd "cd $WORK && gemini -p \"$1\" --approval-mode yolo ${model_args[*]}"
+  echo_cmd "cd $WORK && timeout -k 10 300 gemini -p \"$1\" --approval-mode auto_edit --skip-trust ${model_args[*]}"
   (
-    cd "$WORK" && gemini -p "$1" --approval-mode yolo "${model_args[@]}"
+    cd "$WORK" && timeout -k 10 300 gemini -p "$1" --approval-mode auto_edit --skip-trust "${model_args[@]}"
   ) >"$WORK/_gm_out.txt" 2>"$WORK/_gm_err.txt" || rc=$?
   if [ "$rc" -ne 0 ]; then
     touch "$BATS_RUN_TMPDIR/gemini_unusable"

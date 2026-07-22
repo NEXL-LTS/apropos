@@ -32,15 +32,19 @@ if ! command -v bats >/dev/null 2>&1; then
   exit 127
 fi
 
-# e2e/project/.claude, .opencode, and .gemini are generated, not committed
-# (see its .gitignore) — regenerate them here so the fixture is always wired
-# for every agent before bats copies it per test, regardless of whether this
-# machine has claude/opencode/gemini installed (helpers.bash's
+# e2e/project/.claude, .opencode, .gemini, and CLAUDE.md are generated, not
+# committed (see its .gitignore) — regenerate them here so the fixture is
+# always wired for every agent before bats copies it per test, regardless of
+# whether this machine has claude/opencode/gemini installed (helpers.bash's
 # require_live_<x> is what decides whether the *live* tests run; the wiring
 # itself must exist either way). `--tool` is used explicitly rather than left
-# to auto-detect for exactly that reason. All three commands are idempotent.
+# to auto-detect for exactly that reason. `--claude-symlink` matters here:
+# unlike OpenCode and Gemini, Claude Code does not fall back to AGENTS.md
+# when no CLAUDE.md is reachable anywhere in the directory hierarchy, so
+# without the symlink the live Claude tests would run with zero Layer 1
+# context. All commands are idempotent.
 [ -x "$APROPOS_BIN" ] || ( cd "$REPO_ROOT" && make release >/dev/null )
-"$APROPOS_BIN" init --tool claude --tool opencode --tool gemini --repo-root "$E2E_DIR/project" >/dev/null
+"$APROPOS_BIN" init --tool claude --tool opencode --tool gemini --claude-symlink --repo-root "$E2E_DIR/project" >/dev/null
 "$APROPOS_BIN" generate --repo-root "$E2E_DIR/project" >/dev/null
 
 exec bats "$@" "$E2E_DIR/tests"

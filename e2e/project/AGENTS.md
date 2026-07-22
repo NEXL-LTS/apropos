@@ -1,27 +1,21 @@
 # calc
 
-A tiny sample codebase for apropos's end-to-end test. It exists so a real Claude
-Code run can be observed picking up scoped conventions that apropos injects at
-edit time — one convention per layer of the standard, plus a combined
-path+content example.
+A small Python utility codebase: string helpers, arithmetic operations,
+background jobs, and a data-access layer.
 
 ## Layout
 
-- `lib/calc.py` — the arithmetic library (Layer 4 skill target).
-- `src/` — governed source (Layer 2 path-scoped rule).
-- `scripts/` — background jobs (Layer 3 construct-scoped rule).
-- `db/` — data-access layer (Layer 3 path+content rule).
+- `lib/calc.py` — arithmetic operations.
+- `src/` — string utilities.
+- `scripts/` — background jobs.
+- `db/` — data-access layer.
 
 ## Commands
 
-- `python -m pytest` — run the tests (none required for the e2e).
+- None — no build, lint, or test tooling
 
 ## Universal rules
 
 - Keep functions small and pure; no side effects in `lib/`.
-
-## Where scoped guidance lives
-
-Path- and construct-scoped conventions live in `docs/conventions/` and are
-delivered automatically at edit time by apropos's hooks (see
-`docs/conventions/README.md`). Do not restate them here.
+- There is no testing framework in this codebase. Make changes directly;
+  do not write or run tests.
