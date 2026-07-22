@@ -8,12 +8,7 @@
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/ameba-review.sh\"",
             "timeout": 30
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
+          },
           {
             "type": "command",
             "command": "apropos hook post",
@@ -25,6 +20,16 @@
     "PreToolUse": [
       {
         "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "apropos hook pre",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
         "hooks": [
           {
             "type": "command",
