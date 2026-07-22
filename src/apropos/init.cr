@@ -59,8 +59,11 @@ module Apropos
     # Printed once per run to point at the bootstrapping prompt — most repos
     # arrive with docs already scattered across READMEs/wikis/comments, and an
     # agent can sort those into layers faster than a human writing from scratch.
+    # A fully-qualified URL, not a relative "README.md#..." — this section
+    # lives in *apropos's own* README, not the target repo's, and terminals
+    # only auto-hyperlink absolute URLs.
     NEXT_STEPS_HINT = "next     have your agent bootstrap docs/conventions/ from your existing " \
-                      "docs — see README.md#bootstrapping-from-an-existing-codebase"
+                      "docs — see https://github.com/NEXL-LTS/apropos#bootstrapping-from-an-existing-codebase"
 
     def run(repo_root : Path, fs : Filesystem, env : Environment, options : Options, stdout : IO, stderr : IO) : Int32
       tools = resolve_tools(env, options.tools)
@@ -201,10 +204,11 @@ module Apropos
       hash.dup
     end
 
-    # Ensure the group with this exact `matcher` carries every command in
-    # `commands`, healing (refreshing present commands to the current
-    # `hook_command` shape, appending whatever's missing) when that group
-    # already exists, or appending a fresh one when it doesn't.
+    # Ensure every command in `commands` exists in at least one group with
+    # this exact `matcher`, healing (refreshing present commands to the
+    # current `hook_command` shape, appending whatever's missing to one of
+    # them) when a group already exists, or appending a fresh one carrying
+    # all of `commands` when none does.
     #
     # Matcher-keyed, not command-ownership-keyed: `apropos hook pre` is
     # wired onto two matchers here ("Edit|Write" and "Read"), so a search
@@ -213,14 +217,29 @@ module Apropos
     # reaches first (order in the JSON array is not guaranteed) and heal
     # that one, potentially leaving the *other* matcher's group never
     # created. Keying on the matcher instead means each call only ever
-    # touches the one group it's actually about.
+    # touches the group(s) it's actually about.
+    #
+    # A given matcher can have more than one group already — e.g. a legacy
+    # apropos version (or a hand-edit) put its own command in a separate
+    # "Edit|Write" group instead of a foreign hook's — so presence is
+    # checked across *every* matching group, not just the first: otherwise
+    # healing the foreign hook's group would add a second copy of a command
+    # already installed in the other one. Missing commands are appended to
+    # only the first matching group.
     private def ensure_commands(groups : Array(JSON::Any), matcher : String,
                                 commands : Array(String), timeout : Int64) : Array(JSON::Any)
-      index = groups.index { |group| group_matcher(group) == matcher }
-      return groups + [hook_group(matcher, commands, timeout)] if index.nil?
+      matching = groups.each_index.select { |i| group_matcher(groups[i]) == matcher }.to_a
+      return groups + [hook_group(matcher, commands, timeout)] if matching.empty?
 
       groups = groups.dup
-      groups[index] = with_missing_hooks(groups[index], commands, timeout)
+      matching.each { |i| groups[i] = refresh_owned_hooks(groups[i], commands, timeout) }
+
+      present = matching.flat_map { |i| present_commands(groups[i]) }
+      missing = commands.reject { |command| present.includes?(command) }
+      return groups if missing.empty?
+
+      target = matching.first
+      groups[target] = append_hooks(groups[target], missing, timeout)
       groups
     end
 
@@ -228,21 +247,30 @@ module Apropos
       group.as_h?.try(&.["matcher"]?).try(&.as_s?)
     end
 
-    # Refresh every one of *our* commands already in `present` to the current
-    # `hook_command` shape (so a stale field converges on the next `init` run
-    # instead of surviving forever) and append whichever of `commands` is
-    # still missing. Foreign hooks (anything not in `commands`) pass through
-    # untouched.
-    private def with_missing_hooks(group : JSON::Any, commands : Array(String), timeout : Int64) : JSON::Any
+    private def present_commands(group : JSON::Any) : Array(String)
+      hooks = group.as_h?.try(&.["hooks"]?).try(&.as_a?) || [] of JSON::Any
+      hooks.compact_map { |hook| hook.as_h?.try(&.["command"]?).try(&.as_s?) }
+    end
+
+    # Refresh every one of *our* commands already in this group to the
+    # current `hook_command` shape (so a stale field converges on the next
+    # `init` run instead of surviving forever). Foreign hooks (anything not
+    # in `commands`) pass through untouched.
+    private def refresh_owned_hooks(group : JSON::Any, commands : Array(String), timeout : Int64) : JSON::Any
       hash = group.as_h.dup
       present = hash["hooks"]?.try(&.as_a?) || [] of JSON::Any
       refreshed = present.map do |hook|
         command = hook.as_h?.try(&.["command"]?).try(&.as_s?)
         command && commands.includes?(command) ? hook_command(command, timeout) : hook
       end
-      present_commands = present.compact_map { |hook| hook.as_h?.try(&.["command"]?).try(&.as_s?) }
-      missing = commands.reject { |command| present_commands.includes?(command) }
-      hash["hooks"] = JSON::Any.new(refreshed + missing.map { |command| hook_command(command, timeout) })
+      hash["hooks"] = JSON::Any.new(refreshed)
+      JSON::Any.new(hash)
+    end
+
+    private def append_hooks(group : JSON::Any, commands : Array(String), timeout : Int64) : JSON::Any
+      hash = group.as_h.dup
+      present = hash["hooks"]?.try(&.as_a?) || [] of JSON::Any
+      hash["hooks"] = JSON::Any.new(present + commands.map { |command| hook_command(command, timeout) })
       JSON::Any.new(hash)
     end
 
