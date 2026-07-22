@@ -15,7 +15,8 @@ keeps the guidance small and just-in-time: rules live in
 [`docs/conventions/`](./docs/conventions/) as markdown with YAML frontmatter,
 and apropos delivers each one exactly when the file or construct it governs is
 being touched — nothing sooner, nothing later. It makes no LLM calls —
-triggering is deterministic — and ships as a static Linux binary.
+triggering is deterministic — and ships as a static Linux / dynamically-linked
+macOS binary.
 
 ## Supported CLI agents
 
@@ -34,9 +35,11 @@ curl -fsSL https://raw.githubusercontent.com/NEXL-LTS/apropos/main/install.sh | 
 
 The installer resolves the latest release, verifies its SHA256 checksum, and
 installs `apropos` to `$HOME/.local/bin` (override with `APROPOS_BIN_DIR`; pin a tag
-with `APROPOS_VERSION`). v1 ships fully static Linux x86_64 and arm64 binaries
-(the installer picks the right one from `uname -m`); macOS and Windows are on
-the roadmap.
+with `APROPOS_VERSION`). Ships fully static Linux x86_64/arm64 binaries and
+dynamically linked macOS x86_64/arm64 binaries (the installer picks the right
+one from `uname -s`/`uname -m`); Windows is on the roadmap. The macOS binaries
+depend on nothing beyond system frameworks — no Homebrew required — since the
+third-party libs Crystal's stdlib pulls in are statically linked at build time.
 
 From source (requires [Crystal](https://crystal-lang.org) ≥ 1.20):
 
@@ -227,8 +230,10 @@ Every command takes `--help`, `--repo-root <dir>` (default: walk up to the neare
 - **Fail-open hooks, fail-closed CI.** A hook never blocks or breaks an edit; on
   any internal error it exits 0 and emits nothing. `generate --check` and `lint`
   exit non-zero on any violation.
-- **No runtime dependencies.** A fully static musl binary; the only shell-out off
-  the hook path is optional `git` for `review`.
+- **No runtime dependencies.** A fully static musl binary on Linux; on macOS,
+  where a fully static binary isn't possible, the third-party libs are
+  statically linked so only system frameworks are needed. The only shell-out
+  off the hook path is optional `git` for `review`.
 
 ## Non-goals (v1)
 
@@ -242,10 +247,10 @@ Every command takes `--help`, `--repo-root <dir>` (default: walk up to the neare
 
 ## Roadmap
 
-macOS (arm64/x86_64) and Windows release legs; `--redup-after N` for re-injecting
-a rule every N edits; Cursor/Copilot emitters from the same frontmatter; advisory
-lint-rule linkage (teaching messages that cite rule files); a `review` posting mode
-for CI (GitHub PR comments).
+Windows release leg; `--redup-after N` for re-injecting a rule every N edits;
+Cursor/Copilot emitters from the same frontmatter; advisory lint-rule linkage
+(teaching messages that cite rule files); a `review` posting mode for CI (GitHub
+PR comments).
 
 ## Development
 

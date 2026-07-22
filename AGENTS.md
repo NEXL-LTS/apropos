@@ -6,7 +6,7 @@ the right moment. It implements a layered documentation structure (defined in
 trigger index, generates skill wrappers, serves as a Claude Code hook handler
 that injects path- and construct-scoped rules at edit time, and resolves the
 conventions that apply to a diff for review. Written in Crystal; ships as a
-static Linux binary. See `README.md` for the user-facing overview.
+static Linux/macOS binary. See `README.md` for the user-facing overview.
 
 ## Commands
 
