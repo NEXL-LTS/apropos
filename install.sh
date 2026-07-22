@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # apropos installer — resolves a GitHub release, verifies its checksum, and drops
-# the static binary on your PATH. Curl-pipe friendly:
+# the binary on your PATH. Curl-pipe friendly:
 #
 #   curl -fsSL https://raw.githubusercontent.com/NEXL-LTS/apropos/main/install.sh | sh
 #
@@ -23,15 +23,28 @@ die() {
 }
 
 # --- Platform gate -----------------------------------------------------------
-# v1 ships fully static Linux x86_64/arm64 binaries only. macOS and Windows are
-# on the roadmap; until their release legs are enabled, build from source.
+# Linux ships fully static x86_64/arm64 binaries; macOS ships dynamically linked
+# (against system frameworks only — third-party deps are statically linked in)
+# arm64/x86_64 binaries. Windows is on the roadmap; until its release leg is
+# enabled, build from source.
 os="$(uname -s)"
 arch="$(uname -m)"
-[ "$os" = "Linux" ] || die "unsupported OS '$os'; v1 ships Linux binaries only (build from source: make install)."
-case "$arch" in
-  x86_64 | amd64) asset="apropos-linux-x86_64" ;;
-  aarch64 | arm64) asset="apropos-linux-arm64" ;;
-  *) die "unsupported architecture '$arch'; v1 ships x86_64/arm64 only (build from source: make install)." ;;
+case "$os" in
+  Linux)
+    case "$arch" in
+      x86_64 | amd64) asset="apropos-linux-x86_64" ;;
+      aarch64 | arm64) asset="apropos-linux-arm64" ;;
+      *) die "unsupported architecture '$arch'; Linux ships x86_64/arm64 only (build from source: make install)." ;;
+    esac
+    ;;
+  Darwin)
+    case "$arch" in
+      x86_64) asset="apropos-darwin-x86_64" ;;
+      arm64) asset="apropos-darwin-arm64" ;;
+      *) die "unsupported architecture '$arch'; macOS ships x86_64/arm64 only (build from source: make install)." ;;
+    esac
+    ;;
+  *) die "unsupported OS '$os'; ships Linux and macOS binaries only (build from source: make install)." ;;
 esac
 
 # --- Downloader --------------------------------------------------------------

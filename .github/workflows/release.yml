@@ -3,15 +3,19 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # Lets a maintainer exercise the full build/link/sign/verify pipeline on any
+  # branch via `gh workflow run release.yml --ref <branch>` (or the Actions UI)
+  # without creating a tag or a GitHub Release — the release-attach step below
+  # is gated to tag pushes, and every leg uploads its binary as a workflow
+  # artifact so it can be downloaded and sanity-checked by hand.
+  workflow_dispatch: {}
 
 permissions: {}
 
-# Written as a matrix from day one with only the Linux legs enabled.
-# Roadmap legs (disabled until their own CI is green):
-#   - macOS arm64/x86_64 (dynamic against system libs; macOS has no static libc)
+# Roadmap leg (disabled until its own CI is green):
 #   - Windows x86_64 (Crystal Windows support is Preview — no production promise)
 jobs:
-  build:
+  build-linux:
     strategy:
       fail-fast: false
       matrix:
@@ -48,10 +52,117 @@ jobs:
           ldd ${{ matrix.name }} 2>&1 | grep -q "not a dynamic executable" \
             || { echo "ERROR: binary is not fully static"; exit 1; }
 
+      - name: Smoke test
+        run: |
+          chmod +x ${{ matrix.name }}
+          ./${{ matrix.name }} --version
+
       - name: Checksum
         run: sha256sum ${{ matrix.name }} > ${{ matrix.name }}.sha256
 
+      - name: Upload build artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ matrix.name }}
+          path: |
+            ${{ matrix.name }}
+            ${{ matrix.name }}.sha256
+          if-no-files-found: error
+
       - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        # zizmor: ignore[superfluous-actions] the matrix legs attach to a
+        # single release; this action handles the create-or-update race that a
+        # hand-rolled `gh release` script would not.
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
+        with:
+          files: |
+            ${{ matrix.name }}
+            ${{ matrix.name }}.sha256
+
+  build-macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Native Apple Silicon runner (arm64 is macos-latest since Aug 2025).
+          - { name: apropos-darwin-arm64, runner: macos-15 }
+          # GitHub's last committed Intel macOS image; retires ~Aug 2027 as
+          # Apple/GitHub phase out x86_64 macOS runners entirely.
+          - { name: apropos-darwin-x86_64, runner: macos-15-intel }
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: write # create the release and upload the built assets
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: crystal-lang/install-crystal@d8ef131ecec0352ce0e39b81b0a6d95def58fe2f # v1.9.2
+        with:
+          crystal: 1.20.3
+
+      # macOS has no static libc (Apple doesn't ship one), so a fully static
+      # binary like the Linux legs isn't possible here. Instead, statically
+      # link the third-party deps Crystal's stdlib pulls in (yaml, pcre2, the
+      # Boehm GC, libevent) via their Homebrew .a archives, so the shipped
+      # binary depends on nothing beyond macOS system frameworks — no
+      # Homebrew required on the installing machine. `PKG_CONFIG_PATH` is
+      # unset so the linker can't find Homebrew's .dylib and prefer it over
+      # the .a passed explicitly.
+      - name: Build (static third-party libs, dynamic system libs)
+        run: |
+          set -e
+          brew install libyaml pcre2 bdw-gc libevent
+          shards install --production
+          unset PKG_CONFIG_PATH
+          yaml_lib="$(brew --prefix libyaml)/lib/libyaml.a"
+          pcre2_lib="$(brew --prefix pcre2)/lib/libpcre2-8.a"
+          gc_lib="$(brew --prefix bdw-gc)/lib/libgc.a"
+          event_lib="$(brew --prefix libevent)/lib/libevent.a"
+          crystal build --release \
+            --link-flags "$yaml_lib $pcre2_lib $gc_lib $event_lib" \
+            src/apropos.cr -o ${{ matrix.name }}
+
+      # Apple Silicon's kernel refuses to run an executable with no code
+      # signature at all (SIGKILL), independent of Gatekeeper/notarization.
+      # An ad-hoc signature (no certificate, no Apple Developer account)
+      # satisfies that check; it does not satisfy Gatekeeper's quarantine
+      # check for browser-downloaded files, but `curl`-based installs (this
+      # project's install.sh included) never set the quarantine attribute.
+      - name: Ad-hoc code sign
+        run: codesign --force --sign - ${{ matrix.name }}
+
+      - name: Verify linkage
+        run: |
+          file ${{ matrix.name }}
+          # The static libs above must not show up as dylibs; only macOS
+          # system paths (/usr/lib, /System/...) should remain.
+          if otool -L ${{ matrix.name }} | tail -n +2 | grep -viq -e '/usr/lib/' -e '/System/'; then
+            echo "ERROR: binary links a non-system dylib (a Homebrew dep leaked in dynamically):"
+            otool -L ${{ matrix.name }}
+            exit 1
+          fi
+
+      - name: Smoke test
+        run: |
+          chmod +x ${{ matrix.name }}
+          ./${{ matrix.name }} --version
+
+      - name: Checksum
+        run: shasum -a 256 ${{ matrix.name }} > ${{ matrix.name }}.sha256
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ matrix.name }}
+          path: |
+            ${{ matrix.name }}
+            ${{ matrix.name }}.sha256
+          if-no-files-found: error
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
         # zizmor: ignore[superfluous-actions] the matrix legs attach to a
         # single release; this action handles the create-or-update race that a
         # hand-rolled `gh release` script would not.
