@@ -3,7 +3,7 @@ require "file_utils"
 
 describe "AgentApropos.find_repo_root" do
   it "returns the directory that contains .git" do
-    dir = File.tempname("apropos-root")
+    dir = File.tempname("agent-apropos-root")
     begin
       Dir.mkdir_p(File.join(dir, ".git"))
       root = AgentApropos.find_repo_root(Path[dir])
@@ -14,7 +14,7 @@ describe "AgentApropos.find_repo_root" do
   end
 
   it "walks up from a nested directory to the repo root" do
-    dir = File.tempname("apropos-root")
+    dir = File.tempname("agent-apropos-root")
     begin
       Dir.mkdir_p(File.join(dir, ".git"))
       nested = File.join(dir, "a/b/c")
@@ -26,7 +26,7 @@ describe "AgentApropos.find_repo_root" do
   end
 
   it "returns nil when no .git exists up to the filesystem root" do
-    dir = File.tempname("apropos-root")
+    dir = File.tempname("agent-apropos-root")
     begin
       Dir.mkdir_p(dir)
       AgentApropos.find_repo_root(Path[dir]).should be_nil

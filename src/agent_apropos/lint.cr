@@ -7,7 +7,7 @@ require "./skills"
 require "./filesystem"
 
 module AgentApropos
-  # `apropos lint`: validate the convention structure against the
+  # `agent-apropos lint`: validate the convention structure against the
   # standard's quality bar and exit non-zero on any error. It is a CI command, so
   # it fails **closed** — but it reports *every* problem it can find rather than
   # stopping at the first, so a malformed doc becomes a finding, not a crash.
@@ -31,7 +31,7 @@ module AgentApropos
     def run(repo_root : Path, fs : Filesystem, strict : Bool, stdout : IO, stderr : IO) : Int32
       report(collect(repo_root, fs), strict, stdout)
     rescue ex : AgentApropos::Error
-      stderr.puts "apropos lint: #{ex.message}"
+      stderr.puts "agent-apropos lint: #{ex.message}"
       1
     end
 
@@ -136,14 +136,14 @@ module AgentApropos
         wrappers.each do |slug, content|
           actual = fs.read?(repo_root.join(root, slug, "SKILL.md").to_s)
           if actual.nil?
-            findings << Finding.new(:error, wrapper_display(root, slug), "missing generated wrapper (run `apropos generate`)")
+            findings << Finding.new(:error, wrapper_display(root, slug), "missing generated wrapper (run `agent-apropos generate`)")
           elsif actual != content
-            findings << Finding.new(:error, wrapper_display(root, slug), "stale generated wrapper (run `apropos generate`)")
+            findings << Finding.new(:error, wrapper_display(root, slug), "stale generated wrapper (run `agent-apropos generate`)")
           end
         end
 
         (existing_slugs(repo_root, fs, root) - wrappers.keys).sort.each do |slug|
-          findings << Finding.new(:error, wrapper_display(root, slug), "orphaned generated wrapper (run `apropos generate`)")
+          findings << Finding.new(:error, wrapper_display(root, slug), "orphaned generated wrapper (run `agent-apropos generate`)")
         end
       end
       findings

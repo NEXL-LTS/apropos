@@ -8,7 +8,7 @@ describe AgentApropos::Environment::Real do
 
   it "resolves an executable on PATH and returns nil for a missing one" do
     env.which("sh").should_not be_nil
-    env.which("apropos-definitely-absent-xyz").should be_nil
+    env.which("agent-apropos-definitely-absent-xyz").should be_nil
   end
 
   it "captures stdout on success" do
@@ -20,6 +20,6 @@ describe AgentApropos::Environment::Real do
   end
 
   it "returns nil when the command cannot be launched" do
-    env.run_capture("apropos-definitely-absent-xyz", [] of String).should be_nil
+    env.run_capture("agent-apropos-definitely-absent-xyz", [] of String).should be_nil
   end
 end

@@ -4,7 +4,7 @@ require "./conventions"
 module AgentApropos
   # The trigger index: a compiled, serialized view of every
   # convention doc so the hot hook path never parses YAML. Persisted as
-  # deterministic JSON at `.cache/apropos/index.json` and rebuilt only when a
+  # deterministic JSON at `.cache/agent-apropos/index.json` and rebuilt only when a
   # doc's content hash changes (or the index is absent / a different schema
   # version). This module owns build, (de)serialization, and the staleness
   # decision — a mutation-testing target.

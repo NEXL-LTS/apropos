@@ -12,15 +12,15 @@ require "./repo_root"
 require "./filesystem"
 
 module AgentApropos
-  # Command routing for the `apropos` binary.
+  # Command routing for the `agent-apropos` binary.
   #
   # All output goes through injected IO so the router is unit-testable without a
   # subprocess.
   class CLI
     USAGE = <<-USAGE
-      apropos — deliver the right conventions to the right moment.
+      agent-apropos — deliver the right conventions to the right moment.
 
-      Usage: apropos <command> [options]
+      Usage: agent-apropos <command> [options]
 
       Commands:
         init        Bootstrap the convention structure into a repo
@@ -51,7 +51,7 @@ module AgentApropos
         @stdout.puts USAGE
         0
       when "--version", "version"
-        @stdout.puts "apropos #{VERSION}"
+        @stdout.puts "agent-apropos #{VERSION}"
         0
       else
         dispatch(first, args[1..])
@@ -72,12 +72,12 @@ module AgentApropos
       when "lint"     then handle_lint(rest)
       when "doctor"   then handle_doctor(rest)
       else
-        @stderr.puts "apropos: unknown command '#{command}'. Run `apropos --help`."
+        @stderr.puts "agent-apropos: unknown command '#{command}'. Run `agent-apropos --help`."
         1
       end
     end
 
-    # `apropos generate [--check] [--repo-root DIR]`. Argument parsing
+    # `agent-apropos generate [--check] [--repo-root DIR]`. Argument parsing
     # stays hand-rolled and small; the work lives in `Generate` behind an
     # injected `Filesystem` so it is unit-testable without a subprocess.
     private def handle_generate(args : Array(String)) : Int32
@@ -102,7 +102,7 @@ module AgentApropos
 
       root = override ? Path[override] : AgentApropos.find_repo_root(Path[Dir.current])
       if root.nil?
-        @stderr.puts "apropos generate: no repository root found (looked for .git). Pass --repo-root."
+        @stderr.puts "agent-apropos generate: no repository root found (looked for .git). Pass --repo-root."
         return 1
       end
 
@@ -115,7 +115,7 @@ module AgentApropos
     end
 
     private def usage_error(message : String) : Int32
-      @stderr.puts "apropos generate: #{message}"
+      @stderr.puts "agent-apropos generate: #{message}"
       1
     end
 
@@ -130,7 +130,7 @@ module AgentApropos
       property override : String? = nil
     end
 
-    # `apropos init [--force] [--example] [--claude-symlink] [--dry-run]
+    # `agent-apropos init [--force] [--example] [--claude-symlink] [--dry-run]
     # [--tool claude|opencode|gemini] [--repo-root DIR]`. An authoring command:
     # fails *closed*. `--tool` is repeatable; omit it entirely to auto-detect.
     private def handle_init(args : Array(String)) : Int32
@@ -188,7 +188,7 @@ module AgentApropos
       nil
     end
 
-    # `apropos lint [--strict] [--repo-root DIR]`. CI command: fails
+    # `agent-apropos lint [--strict] [--repo-root DIR]`. CI command: fails
     # *closed*.
     private def handle_lint(args : Array(String)) : Int32
       strict = false
@@ -215,7 +215,7 @@ module AgentApropos
       Lint.run(root, Filesystem::Real.new, strict, @stdout, @stderr)
     end
 
-    # `apropos doctor [--repo-root DIR]`.
+    # `agent-apropos doctor [--repo-root DIR]`.
     private def handle_doctor(args : Array(String)) : Int32
       override : String? = nil
       index = 0
@@ -238,7 +238,7 @@ module AgentApropos
       Doctor.run(root, Filesystem::Real.new, Environment::Real.new, @stdout, @stderr)
     end
 
-    # `apropos hook pre|post [--repo-root DIR]`. The wired CLI agent (Claude
+    # `agent-apropos hook pre|post [--repo-root DIR]`. The wired CLI agent (Claude
     # Code and Gemini CLI natively; OpenCode via its generated plugin) invokes
     # these with the payload on stdin. The whole family fails *open*: an
     # unknown subcommand or a bad `--repo-root` yields exit 0 with no output
@@ -248,7 +248,7 @@ module AgentApropos
       return 0 unless event == "pre" || event == "post"
 
       override = repo_root_override(args[1..])
-      verbose = {"1", "true"}.includes?(ENV["APROPOS_VERBOSE"]?)
+      verbose = {"1", "true"}.includes?(ENV["AGENT_APROPOS_VERBOSE"]?)
       fs = Filesystem::Real.new
       now = Time.utc
       if event == "pre"
@@ -274,7 +274,7 @@ module AgentApropos
       getter paths = [] of String
     end
 
-    # `apropos match [--format paths|json|full] [--stdin-content] <path> [...]`
+    # `agent-apropos match [--format paths|json|full] [--stdin-content] <path> [...]`
     # . A review/CI command: fails *closed* on a bad option or a
     # malformed doc.
     private def handle_match(args : Array(String)) : Int32
@@ -330,7 +330,7 @@ module AgentApropos
       nil
     end
 
-    # `apropos review [--format md|json] [<git-range>]`. Fails *closed*.
+    # `agent-apropos review [--format md|json] [<git-range>]`. Fails *closed*.
     private def handle_review(args : Array(String)) : Int32
       format = "md"
       override : String? = nil
@@ -373,22 +373,22 @@ module AgentApropos
     end
 
     private def repo_root_error(command : String) : Int32
-      @stderr.puts "apropos #{command}: no repository root found (looked for .git). Pass --repo-root."
+      @stderr.puts "agent-apropos #{command}: no repository root found (looked for .git). Pass --repo-root."
       1
     end
 
     private def command_error(command : String, message : String) : Int32
-      @stderr.puts "apropos #{command}: #{message}"
+      @stderr.puts "agent-apropos #{command}: #{message}"
       1
     end
 
     private def match_error(message : String) : Int32
-      @stderr.puts "apropos match: #{message}"
+      @stderr.puts "agent-apropos match: #{message}"
       1
     end
 
     private def review_error(message : String) : Int32
-      @stderr.puts "apropos review: #{message}"
+      @stderr.puts "agent-apropos review: #{message}"
       1
     end
   end

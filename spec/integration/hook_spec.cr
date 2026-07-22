@@ -10,8 +10,8 @@ private def run_hook(binary : String, args : Array(String), payload : String) : 
   {status.exit_code, stdout.to_s}
 end
 
-describe "apropos hook (binary)" do
-  binary = File.join(Dir.tempdir, "apropos-hook-#{Process.pid}")
+describe "agent-apropos hook (binary)" do
+  binary = File.join(Dir.tempdir, "agent-apropos-hook-#{Process.pid}")
 
   Spec.before_suite do
     status = Process.run(
@@ -20,7 +20,7 @@ describe "apropos hook (binary)" do
       output: Process::Redirect::Inherit,
       error: Process::Redirect::Inherit
     )
-    raise "failed to build apropos binary for integration specs" unless status.success?
+    raise "failed to build agent-apropos binary for integration specs" unless status.success?
   end
 
   Spec.after_suite do
@@ -28,7 +28,7 @@ describe "apropos hook (binary)" do
   end
 
   it "injects a Layer 2 rule on PreToolUse and dedupes within a session" do
-    dir = File.tempname("apropos-hook-repo")
+    dir = File.tempname("agent-apropos-hook-repo")
     begin
       Dir.mkdir_p(File.join(dir, "docs/conventions"))
       File.write(File.join(dir, "docs/conventions/jobs.md"),
@@ -51,7 +51,7 @@ describe "apropos hook (binary)" do
   end
 
   it "injects a Layer 3 rule on PostToolUse from written content" do
-    dir = File.tempname("apropos-hook-repo")
+    dir = File.tempname("agent-apropos-hook-repo")
     begin
       Dir.mkdir_p(File.join(dir, "docs/conventions"))
       File.write(File.join(dir, "docs/conventions/db.md"),
@@ -82,7 +82,7 @@ describe "apropos hook (binary)" do
   # spec/fixtures/hook_payloads/), proving the binary needs no Gemini-specific
   # code, not just the injected-IO unit specs.
   it "handles a Gemini CLI write_file AfterTool payload with no tool-specific code" do
-    dir = File.tempname("apropos-hook-repo")
+    dir = File.tempname("agent-apropos-hook-repo")
     begin
       Dir.mkdir_p(File.join(dir, "docs/conventions"))
       File.write(File.join(dir, "docs/conventions/db.md"),
@@ -100,7 +100,7 @@ describe "apropos hook (binary)" do
   end
 
   it "handles a Gemini CLI replace AfterTool payload with no tool-specific code" do
-    dir = File.tempname("apropos-hook-repo")
+    dir = File.tempname("agent-apropos-hook-repo")
     begin
       Dir.mkdir_p(File.join(dir, "docs/conventions"))
       File.write(File.join(dir, "docs/conventions/jobs.md"),

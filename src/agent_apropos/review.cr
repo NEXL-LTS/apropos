@@ -47,7 +47,7 @@ module AgentApropos
       end
     end
 
-    # `apropos match <path> [...paths]`. `stdin_content`, when given,
+    # `agent-apropos match <path> [...paths]`. `stdin_content`, when given,
     # replaces the on-disk content for the (single) path so a proposed patch can
     # be tested.
     def match(repo_root : Path, fs : Filesystem, paths : Array(String),
@@ -59,11 +59,11 @@ module AgentApropos
       render_match(files, format, stdout)
       0
     rescue ex : AgentApropos::Error
-      stderr.puts "apropos match: #{ex.message}"
+      stderr.puts "agent-apropos match: #{ex.message}"
       1
     end
 
-    # `apropos review [<git-range>]`. Resolves the range (default:
+    # `agent-apropos review [<git-range>]`. Resolves the range (default:
     # merge-base with the default branch), then matches each changed file's path
     # and added lines.
     def run(repo_root : Path, fs : Filesystem, git : Git, range : String?,
@@ -76,7 +76,7 @@ module AgentApropos
       render_review(resolved, files, format, stdout)
       0
     rescue ex : AgentApropos::Error
-      stderr.puts "apropos review: #{ex.message}"
+      stderr.puts "agent-apropos review: #{ex.message}"
       1
     end
 

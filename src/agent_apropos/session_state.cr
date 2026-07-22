@@ -4,7 +4,7 @@ require "./filesystem"
 module AgentApropos
   # Per-session dedup store: the set of rule-file paths already
   # injected during a Claude Code session, so a rule is delivered at most once
-  # per session. Persisted as JSON at `.cache/apropos/sessions/<session_id>.json`
+  # per session. Persisted as JSON at `.cache/agent-apropos/sessions/<session_id>.json`
   # with an `updated_at` stamp used to prune stale files opportunistically.
   #
   # All disk access goes through an injected `Filesystem`; the clock is injected

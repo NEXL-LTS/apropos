@@ -49,7 +49,7 @@ describe AgentApropos::Lint do
     fs = InMemoryFS.new({"/repo/agent-apropos.yml" => "key: [unterminated\n"})
     code, _, stderr = run_lint_full(fs)
     code.should eq(1)
-    stderr.should contain("apropos lint:")
+    stderr.should contain("agent-apropos lint:")
     stderr.should contain("not valid YAML")
   end
 

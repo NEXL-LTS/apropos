@@ -4,7 +4,7 @@ require "./skills"
 require "./filesystem"
 
 module AgentApropos
-  # `apropos generate`: compile `docs/conventions/**` into the trigger
+  # `agent-apropos generate`: compile `docs/conventions/**` into the trigger
   # index and the committed skill wrappers, and prune orphaned wrappers. `run`
   # writes; `check` never writes and is the CI drift gate. Both fail *closed* —
   # a malformed doc or slug collision exits non-zero — because generate is an
@@ -26,7 +26,7 @@ module AgentApropos
       prune_orphans(repo_root, fs, wrappers.keys, stdout)
       0
     rescue ex : AgentApropos::Error
-      stderr.puts "apropos generate: #{ex.message}"
+      stderr.puts "agent-apropos generate: #{ex.message}"
       1
     end
 
@@ -55,7 +55,7 @@ module AgentApropos
 
       report_check(drift, wrappers.size, stdout)
     rescue ex : AgentApropos::Error
-      stderr.puts "apropos generate: #{ex.message}"
+      stderr.puts "agent-apropos generate: #{ex.message}"
       1
     end
 

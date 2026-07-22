@@ -16,7 +16,7 @@ private def commit(dir : String, message : String) : Nil
 end
 
 private def with_repo(&)
-  dir = File.tempname("apropos-git")
+  dir = File.tempname("agent-apropos-git")
   begin
     Dir.mkdir_p(dir)
     git(dir, ["init", "-b", "main"])

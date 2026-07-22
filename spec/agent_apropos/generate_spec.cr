@@ -146,7 +146,7 @@ describe AgentApropos::Generate do
         "/repo/docs/conventions/bad.md" => "---\npaths: [unclosed\n---\nbody\n",
       })
       code.should eq(1)
-      stderr.should contain("apropos generate:")
+      stderr.should contain("agent-apropos generate:")
     end
   end
 end

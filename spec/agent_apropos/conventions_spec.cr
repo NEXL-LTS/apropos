@@ -161,7 +161,7 @@ describe AgentApropos::Conventions do
     end
 
     it "reads real files through the default adapter" do
-      dir = File.tempname("apropos-conv")
+      dir = File.tempname("agent-apropos-conv")
       begin
         Dir.mkdir_p(File.join(dir, "docs/conventions/workflows"))
         File.write(File.join(dir, "docs/conventions/a.md"), "---\npaths: [\"src/**\"]\n---\nA\n")

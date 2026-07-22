@@ -155,7 +155,7 @@ describe AgentApropos::Review do
       fs = InMemoryFS.new({"/repo/docs/conventions/bad.md" => "---\npaths: [\n"})
       code, _, stderr = run_match(fs, ["src/x.cr"])
       code.should eq(1)
-      stderr.should contain("apropos match:")
+      stderr.should contain("agent-apropos match:")
     end
   end
 
@@ -218,7 +218,7 @@ describe AgentApropos::Review do
       fs = InMemoryFS.new({} of String => String)
       code, _, stderr = run_review(fs, FakeGit.new(diff_raises: true), "main...HEAD")
       code.should eq(1)
-      stderr.should contain("apropos review: diff boom")
+      stderr.should contain("agent-apropos review: diff boom")
     end
   end
 end

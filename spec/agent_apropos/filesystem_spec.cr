@@ -6,7 +6,7 @@ require "file_utils"
 # generate. Each example is self-contained in a temp dir.
 describe AgentApropos::Filesystem::Real do
   it "writes a file, creating missing parent directories" do
-    dir = File.tempname("apropos-fs")
+    dir = File.tempname("agent-apropos-fs")
     fs = AgentApropos::Filesystem::Real.new
     begin
       target = File.join(dir, "nested/deep/out.txt")
@@ -18,7 +18,7 @@ describe AgentApropos::Filesystem::Real do
   end
 
   it "reads an existing file and returns nil for an absent one" do
-    dir = File.tempname("apropos-fs")
+    dir = File.tempname("agent-apropos-fs")
     fs = AgentApropos::Filesystem::Real.new
     begin
       Dir.mkdir_p(dir)
@@ -32,7 +32,7 @@ describe AgentApropos::Filesystem::Real do
   end
 
   it "appends to a file, creating it and its parents on first write" do
-    dir = File.tempname("apropos-fs")
+    dir = File.tempname("agent-apropos-fs")
     fs = AgentApropos::Filesystem::Real.new
     begin
       target = File.join(dir, "logs/hook.log")
@@ -45,7 +45,7 @@ describe AgentApropos::Filesystem::Real do
   end
 
   it "removes a directory tree and is a no-op when the target is absent" do
-    dir = File.tempname("apropos-fs")
+    dir = File.tempname("agent-apropos-fs")
     fs = AgentApropos::Filesystem::Real.new
     begin
       Dir.mkdir_p(File.join(dir, "skills/foo"))
@@ -59,7 +59,7 @@ describe AgentApropos::Filesystem::Real do
   end
 
   it "reports existence for files, directories, and (even dangling) symlinks" do
-    dir = File.tempname("apropos-fs")
+    dir = File.tempname("agent-apropos-fs")
     fs = AgentApropos::Filesystem::Real.new
     begin
       Dir.mkdir_p(dir)
@@ -78,7 +78,7 @@ describe AgentApropos::Filesystem::Real do
   end
 
   it "creates a symlink, making parent directories as needed" do
-    dir = File.tempname("apropos-fs")
+    dir = File.tempname("agent-apropos-fs")
     fs = AgentApropos::Filesystem::Real.new
     begin
       link = File.join(dir, "nested/CLAUDE.md")

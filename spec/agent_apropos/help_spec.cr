@@ -28,7 +28,7 @@ describe AgentApropos::Help do
     it "prints the mental-model explainer and exits 0" do
       code, stdout = run_help([] of String)
       code.should eq(0)
-      stdout.should contain("What apropos is")
+      stdout.should contain("What agent-apropos is")
       stdout.should contain("Why it exists")
       stdout.should contain("The four layers")
       stdout.should contain("Where things live")
@@ -74,8 +74,8 @@ describe AgentApropos::Help do
     it "prints the mental-model note for a known command and defers to --help" do
       code, stdout = run_help(["review"])
       code.should eq(0)
-      stdout.should contain("apropos review —")
-      stdout.should contain("Run `apropos review --help` for exact flags.")
+      stdout.should contain("agent-apropos review —")
+      stdout.should contain("Run `agent-apropos review --help` for exact flags.")
     end
 
     it "reports an unknown command but still exits 0 (help never fails)" do
@@ -88,7 +88,7 @@ describe AgentApropos::Help do
     it "ignores unknown flags rather than failing" do
       code, stdout = run_help(["--bogus"])
       code.should eq(0)
-      stdout.should contain("What apropos is")
+      stdout.should contain("What agent-apropos is")
     end
   end
 end

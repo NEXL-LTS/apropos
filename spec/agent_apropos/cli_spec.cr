@@ -10,7 +10,7 @@ end
 
 # A throwaway repo with one Layer 2 doc and one skill doc; yields its path.
 private def with_fixture_repo(git : Bool = false, &)
-  dir = File.tempname("apropos-cli")
+  dir = File.tempname("agent-apropos-cli")
   begin
     Dir.mkdir_p(File.join(dir, "docs/conventions/workflows"))
     Dir.mkdir_p(File.join(dir, ".git")) if git
@@ -42,7 +42,7 @@ end
 # A real git repo with one Layer 2 doc, an initial commit on `main`, and a
 # feature commit that edits a `src/**` file — so `review` has a range to resolve.
 private def with_git_repo(&)
-  dir = File.tempname("apropos-cli-review")
+  dir = File.tempname("agent-apropos-cli-review")
   begin
     Dir.mkdir_p(File.join(dir, "docs/conventions"))
     Dir.mkdir_p(File.join(dir, "src"))
@@ -66,7 +66,7 @@ describe AgentApropos::CLI do
     it "prints usage and exits 0 with no args" do
       code, out, err = run([] of String)
       code.should eq(0)
-      out.should contain("Usage: apropos")
+      out.should contain("Usage: agent-apropos")
       err.should be_empty
     end
 
@@ -74,7 +74,7 @@ describe AgentApropos::CLI do
       %w[--help -h].each do |flag|
         code, out, _ = run([flag])
         code.should eq(0)
-        out.should contain("Usage: apropos")
+        out.should contain("Usage: agent-apropos")
       end
     end
   end
@@ -83,8 +83,8 @@ describe AgentApropos::CLI do
     it "prints the mental-model explainer, distinct from --help usage" do
       code, out, _ = run(["help"])
       code.should eq(0)
-      out.should contain("What apropos is")
-      out.should_not contain("Usage: apropos")
+      out.should contain("What agent-apropos is")
+      out.should_not contain("Usage: agent-apropos")
     end
 
     it "renders the JSON explainer" do
@@ -96,7 +96,7 @@ describe AgentApropos::CLI do
     it "explains a single command" do
       code, out, _ = run(["help", "review"])
       code.should eq(0)
-      out.should contain("apropos review —")
+      out.should contain("agent-apropos review —")
     end
   end
 
@@ -105,7 +105,7 @@ describe AgentApropos::CLI do
       %w[--version version].each do |flag|
         code, out, _ = run([flag])
         code.should eq(0)
-        out.should contain("apropos #{AgentApropos::VERSION}")
+        out.should contain("agent-apropos #{AgentApropos::VERSION}")
       end
     end
   end
@@ -353,7 +353,7 @@ describe AgentApropos::CLI do
 
   describe "init" do
     it "scaffolds a repo against an explicit --repo-root, wiring the explicitly named tool" do
-      dir = File.tempname("apropos-cli-init")
+      dir = File.tempname("agent-apropos-cli-init")
       begin
         Dir.mkdir_p(dir)
         code, out, err = run(["init", "--tool", "claude", "--repo-root", dir])
@@ -367,7 +367,7 @@ describe AgentApropos::CLI do
     end
 
     it "threads every scaffolding flag through to Init" do
-      dir = File.tempname("apropos-cli-init-flags")
+      dir = File.tempname("agent-apropos-cli-init-flags")
       begin
         Dir.mkdir_p(dir)
         code, out, _ = run(["init", "--force", "--example", "--claude-symlink", "--dry-run", "--repo-root", dir])
@@ -381,7 +381,7 @@ describe AgentApropos::CLI do
     end
 
     it "scaffolds every tool named across repeated --tool flags" do
-      dir = File.tempname("apropos-cli-init-tool")
+      dir = File.tempname("agent-apropos-cli-init-tool")
       begin
         Dir.mkdir_p(dir)
         code, out, err = run(["init", "--tool", "opencode", "--tool", "claude", "--repo-root", dir])
@@ -396,7 +396,7 @@ describe AgentApropos::CLI do
     end
 
     it "wires only the one tool named, not the other" do
-      dir = File.tempname("apropos-cli-init-tool-single")
+      dir = File.tempname("agent-apropos-cli-init-tool-single")
       begin
         Dir.mkdir_p(dir)
         code, _, err = run(["init", "--tool", "opencode", "--repo-root", dir])
@@ -410,7 +410,7 @@ describe AgentApropos::CLI do
     end
 
     it "wires only gemini when named alone" do
-      dir = File.tempname("apropos-cli-init-tool-gemini")
+      dir = File.tempname("agent-apropos-cli-init-tool-gemini")
       begin
         Dir.mkdir_p(dir)
         code, _, err = run(["init", "--tool", "gemini", "--repo-root", dir])
@@ -418,7 +418,7 @@ describe AgentApropos::CLI do
         err.should be_empty
         File.exists?(File.join(dir, ".gemini/settings.json")).should be_true
         File.exists?(File.join(dir, ".claude/settings.json")).should be_false
-        File.read(File.join(dir, ".gemini/settings.json")).should contain("apropos hook pre")
+        File.read(File.join(dir, ".gemini/settings.json")).should contain("agent-apropos hook pre")
       ensure
         FileUtils.rm_rf(dir)
       end

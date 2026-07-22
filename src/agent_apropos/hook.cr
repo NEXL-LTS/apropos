@@ -49,12 +49,12 @@ module AgentApropos
     # Delivered once per session, on whichever of `pre`/`post` fires
     # first — regardless of whether that particular edit matches any rule —
     # so the agent stops proactively exploring docs/conventions/ on its own
-    # (which would make the with/without-apropos contrast meaningless: a
+    # (which would make the with/without-agent-apropos contrast meaningless: a
     # model that reads the docs directly gets the same content whether or
-    # not apropos's hooks are actually wired). See docs/conventions/README.md
+    # not agent-apropos's hooks are actually wired). See docs/conventions/README.md
     # for the layer model this refers to.
     SESSION_NOTICE = "No need to search for coding conventions, rules, or " \
-                     "guidelines — apropos automatically injects the " \
+                     "guidelines — agent-apropos automatically injects the " \
                      "relevant ones into your context via hooks as you " \
                      "read and edit files."
 
@@ -229,7 +229,7 @@ module AgentApropos
     private def log_failure(fs : Filesystem, override_root : String?, verbose : Bool, ex : Exception) : Nil
       return unless verbose
       dir = override_root ? Path[override_root] : Path[Dir.current]
-      fs.append(dir.join(LOG_RELATIVE).to_s, "apropos hook: #{ex.message}\n")
+      fs.append(dir.join(LOG_RELATIVE).to_s, "agent-apropos hook: #{ex.message}\n")
     rescue
       # Logging must never break the fail-open guarantee.
     end
