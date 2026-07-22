@@ -1,5 +1,5 @@
 {
-  "name": "apropos",
+  "name": "agent-apropos",
   "dockerComposeFile": "docker-compose.yml",
   "service": "app",
   "workspaceFolder": "/workspace",
@@ -15,5 +15,5 @@
       }
     }
   },
-  "postCreateCommand": "make deps && make install && crystal --version && apropos --version && .devcontainer/install_agents.sh"
+  "postCreateCommand": "make deps && make install && crystal --version && agent-apropos --version && .devcontainer/install_agents.sh"
 }
