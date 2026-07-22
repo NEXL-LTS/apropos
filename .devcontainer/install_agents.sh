@@ -5,24 +5,19 @@ set -euo pipefail
 sudo chown -R vscode /home/vscode || true
 sudo chgrp -R vscode /home/vscode || true
 
-declare -A PIDS
 declare -A CMDS
-
+CMDS[claude]="timeout 300 bash -c 'curl -fsSL https://claude.ai/install.sh | bash'"
 CMDS[opencode]="timeout 300 bash -c 'curl -fsSL https://opencode.ai/install | bash'"
 CMDS[cursor]="timeout 300 bash -c 'curl -fsS https://cursor.com/install | bash'"
 CMDS[gemini]="sudo timeout 300 bash -c 'npm install -g @google/gemini-cli'"
 CMDS[codex]="sudo timeout 300 bash -c 'npm install -g @openai/codex'"
 CMDS[copilot]="sudo timeout 300 bash -c 'npm install -g @github/copilot'"
-CMDS[claude]="timeout 300 bash -c 'curl -fsSL https://claude.ai/install.sh | bash'"
 
-for name in "${!CMDS[@]}"; do
-    bash -c "${CMDS[$name]}" &
-    PIDS[$name]=$!
-done
+ORDER=(claude opencode cursor gemini codex copilot)
 
 declare -A RESULTS
-for name in "${!PIDS[@]}"; do
-    if wait "${PIDS[$name]}"; then
+for name in "${ORDER[@]}"; do
+    if bash -c "${CMDS[$name]}"; then
         RESULTS[$name]="OK"
     else
         RESULTS[$name]="FAILED (exit $?)"
@@ -31,6 +26,6 @@ done
 
 echo ""
 echo "=== Install Results ==="
-for name in "${!RESULTS[@]}"; do
+for name in "${ORDER[@]}"; do
     printf "  %-10s %s\n" "$name" "${RESULTS[$name]}"
 done

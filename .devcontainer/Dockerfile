@@ -59,10 +59,12 @@ RUN apt-get update -qq && \
 # Node.js — runtime for the npm-distributed CLI agents below (Gemini CLI,
 # Codex CLI, GitHub Copilot CLI all require Node 20+; NodeSource is used
 # since Ubuntu 24.04's apt-provided nodejs is too old).
-ARG NODE_MAJOR=22
+ARG NODE_MAJOR=24
 RUN curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     rm -rf /var/lib/apt/lists/*
+ARG NPM_VERSION=12.0.1
+RUN npm install -g npm@"${NPM_VERSION}"
 
 # kcov — the coverage gate. Ubuntu 24.04 dropped the `kcov` package,
 # so it is built from a pinned release rather than installed from apt. python3

@@ -29,7 +29,7 @@ services:
       - codex-data:/home/vscode/.codex
       - copilot-data:/home/vscode/.copilot
       - cursor-data:/home/vscode/.cursor
-      - crystal-cache:/home/vscode/.cache/crystal
+      - npm-cache:/home/vscode/.npm
     # kcov (the coverage gate) drives the spec binary under ptrace and calls
     # personality() to disable ASLR. The default container sandbox blocks both,
     # so `make coverage` needs these two relaxations (see the Dockerfile note).
@@ -49,4 +49,4 @@ volumes:
   codex-data:
   copilot-data:
   cursor-data:
-  crystal-cache:
+  npm-cache:
