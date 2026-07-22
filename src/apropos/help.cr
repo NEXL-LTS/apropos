@@ -65,16 +65,18 @@ module Apropos
         ".gemini/skills/); `generate --check` is the CI gate that fails if a " \
         "wrapper is stale or hand-edited."),
       Command.new("hook", "PreToolUse/PostToolUse handlers (Claude Code, Gemini CLI) or plugin bridge (OpenCode)",
-        "You do not run hook by hand. Claude Code invokes `hook pre` and " \
-        "`hook post` at edit time with the tool payload on stdin. The generated " \
-        "OpenCode plugin (.opencode/plugins/apropos.js) calls the same commands " \
-        "via tool.execute.before (Layer 2, pre-write) and tool.execute.after " \
-        "(Layer 3, post-write) and injects context using noReply:true. Gemini " \
-        "CLI calls both `hook pre` and `hook post` from its AfterTool event, " \
-        "since its BeforeTool event cannot inject context — Layer 2 still " \
-        "fires, just after the edit — plus `hook pre` again from AfterTool's " \
-        "read_file match, so Layer 2 can also land on a plain read. All hooks " \
-        "fail open."),
+        "You do not run hook by hand. Claude Code invokes `hook pre` at edit " \
+        "time (and also on its Read tool, so Layer 2 can land as early as " \
+        "the model's first read) and `hook post` after a write, each with " \
+        "the tool payload on stdin. The generated OpenCode plugin " \
+        "(.opencode/plugins/apropos.js) calls the same commands via " \
+        "tool.execute.before (Layer 2, on reads and pre-write) and " \
+        "tool.execute.after (Layer 3, post-write) and injects context using " \
+        "noReply:true. Gemini CLI calls both `hook pre` and `hook post` from " \
+        "its AfterTool event, since its BeforeTool event cannot inject " \
+        "context — Layer 2 still fires, just after the edit — plus `hook " \
+        "pre` again from AfterTool's read_file match, so Layer 2 can also " \
+        "land on a plain read. All hooks fail open."),
       Command.new("match", "Resolve the conventions that apply to given paths",
         "Use match in a review to see which rules apply to a file — Layer 2 by " \
         "path, Layer 3 by on-disk (or --stdin-content) content — in paths, json, " \

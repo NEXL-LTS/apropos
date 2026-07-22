@@ -16,21 +16,24 @@ module Apropos
     MAX_AGE = 7.days
 
     # The on-disk shape. Kept minimal so a lost concurrent update costs at most
-    # one duplicate injection.
+    # one duplicate injection. `notified` defaults to false so session files
+    # written before that field existed still parse.
     struct Document
       include JSON::Serializable
 
       @[JSON::Field(key: "updated_at")]
       getter updated_at : Int64
       getter injected : Array(String)
+      getter? notified : Bool = false
 
-      def initialize(@updated_at : Int64, @injected : Array(String))
+      def initialize(@updated_at : Int64, @injected : Array(String), @notified : Bool = false)
       end
     end
 
     getter injected : Set(String)
+    getter? notified : Bool
 
-    def initialize(@injected : Set(String) = Set(String).new)
+    def initialize(@injected : Set(String) = Set(String).new, @notified : Bool = false)
     end
 
     # Load the state for `session_id`. A missing or unparseable file is treated
@@ -40,7 +43,8 @@ module Apropos
       return new unless session_id
       json = fs.read?(file_for(repo_root, session_id).to_s)
       return new unless json
-      new(Document.from_json(json).injected.to_set)
+      document = Document.from_json(json)
+      new(document.injected.to_set, document.notified?)
     rescue JSON::ParseException
       new
     end
@@ -74,12 +78,17 @@ module Apropos
       @injected << rule_path
     end
 
+    # Mark the one-time session-start notice as delivered.
+    def notify! : Nil
+      @notified = true
+    end
+
     # Persist the state for `session_id`, stamping `now`. The injected set is
     # sorted so the file is byte-stable for a given set (aids debugging and
     # avoids spurious churn). A nil `session_id` is a no-op.
     def save(repo_root : Path, fs : Filesystem, session_id : String?, now : Time) : Nil
       return unless session_id
-      document = Document.new(now.to_unix, @injected.to_a.sort)
+      document = Document.new(now.to_unix, @injected.to_a.sort, @notified)
       fs.write(SessionState.file_for(repo_root, session_id).to_s, "#{document.to_json}\n")
     end
 

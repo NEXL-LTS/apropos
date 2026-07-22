@@ -24,6 +24,18 @@ module Apropos
   # `pre` and `post` onto its single `AfterTool` event (see `init.cr`) since
   # its `BeforeTool` output schema cannot inject context.
   #
+  # `pre` is also wired onto each agent's *read* tool (Claude's Read matcher;
+  # Gemini's AfterTool `read_file` matcher; OpenCode's "read" in the
+  # tool.execute.before allowlist) — Layer 2 depends only on the target
+  # *path*, which a read carries exactly like an edit, so the same rule can
+  # land as early as the model's first read of a file instead of waiting for
+  # it to write there. This matters most for Gemini: its Layer 2 delivery is
+  # already a post-write AfterTool fallback (see `merge_gemini_settings` in
+  # `init.cr`), so without also firing on read, the model can miss the rule
+  # on its first edit and need a second one to correct it. Layer 3 stays
+  # write-only — it matches the *written* content, which doesn't exist yet
+  # on a mere read.
+  #
   # Everything here fails **open**: any internal error exits 0 and
   # emits nothing, so a conventions tool can never block or break an edit. All
   # I/O is injected (filesystem, stdin/stdout IO, clock) so every path is
@@ -33,6 +45,18 @@ module Apropos
 
     INDEX_RELATIVE = Path[".cache", "apropos", "index.json"]
     LOG_RELATIVE   = Path[".cache", "apropos", "log"]
+
+    # Delivered once per session, on whichever of `pre`/`post` fires
+    # first — regardless of whether that particular edit matches any rule —
+    # so the agent stops proactively exploring docs/conventions/ on its own
+    # (which would make the with/without-apropos contrast meaningless: a
+    # model that reads the docs directly gets the same content whether or
+    # not apropos's hooks are actually wired). See docs/conventions/README.md
+    # for the layer model this refers to.
+    SESSION_NOTICE = "No need to search for coding conventions, rules, or " \
+                     "guidelines — apropos automatically injects the " \
+                     "relevant ones into your context via hooks as you " \
+                     "read and edit files."
 
     # PreToolUse handler: match the target *path* against Layer 2 rules and
     # inject them before the write happens.
@@ -67,19 +91,34 @@ module Apropos
 
       index = load_or_build_index(root, fs)
       matches = matches_for(event, index, payload, root, fs, relative)
-      return if matches.empty?
 
       SessionState.prune(root, fs, now)
       state = SessionState.load(root, fs, payload.session_id)
       fresh = matches.reject { |entry| state.injected?(entry.path) }
-      return if fresh.empty?
 
-      context = build_context(root, fs, fresh)
-      return if context.empty?
+      notice = session_notice(state, payload.session_id)
+      combined = combine(notice, build_context(root, fs, fresh))
+      return if combined.empty?
 
       fresh.each { |entry| state.add(entry.path) }
+      state.notify! if notice
       state.save(root, fs, payload.session_id, now)
-      emit(stdout, event_name(event), context)
+      emit(stdout, event_name(event), combined)
+    end
+
+    # The one-time notice, or nil once already delivered this session. A nil
+    # `session_id` means there is no key to remember "already notified"
+    # against, so the notice is skipped entirely rather than repeated on
+    # every call.
+    private def session_notice(state : SessionState, session_id : String?) : String?
+      return nil if session_id.nil? || state.notified?
+      SESSION_NOTICE
+    end
+
+    private def combine(notice : String?, context : String) : String
+      return context if notice.nil?
+      return notice if context.empty?
+      "#{notice}\n\n#{context}"
     end
 
     private def matches_for(event : Symbol, index : Index, payload : Payload,

@@ -183,7 +183,7 @@ describe Apropos::CLI do
 
     it "runs post through the real filesystem and exits 0" do
       with_fixture_repo do |dir|
-        payload = {session_id: "s", tool_name: "Write", cwd: dir,
+        payload = {tool_name: "Write", cwd: dir,
                    tool_input: {file_path: File.join(dir, "src/x.cr"), content: "code"}}.to_json
         code, out, _ = run(["hook", "post", "--repo-root", dir], payload)
         code.should eq(0)
@@ -197,6 +197,18 @@ describe Apropos::CLI do
                    tool_input: {file_path: "src/x.cr"}}.to_json
         code, out, _ = run(["hook", "pre"], payload)
         code.should eq(0)
+        out.should contain("Convention (docs/conventions/a.md):")
+      end
+    end
+
+    it "injects a Layer 2 rule on pre from a Read-tool-shaped payload" do
+      with_fixture_repo do |dir|
+        payload = {session_id: "s", tool_name: "Read", cwd: dir,
+                   tool_input: {file_path: File.join(dir, "src/x.cr")}}.to_json
+        code, out, err = run(["hook", "pre", "--repo-root", dir], payload)
+        code.should eq(0)
+        err.should be_empty
+        out.should contain("No need to search for coding conventions")
         out.should contain("Convention (docs/conventions/a.md):")
       end
     end
