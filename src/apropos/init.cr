@@ -177,7 +177,7 @@ module Apropos
 
       pre_groups = (hooks["PreToolUse"]?.try(&.as_a?)).try(&.dup) || [] of JSON::Any
       pre_groups = ensure_commands(pre_groups, "Edit|Write", ["apropos hook pre"], CLAUDE_HOOK_TIMEOUT)
-      pre_groups = ensure_command_on_matcher(pre_groups, "Read", "apropos hook pre", CLAUDE_HOOK_TIMEOUT)
+      pre_groups = ensure_commands(pre_groups, "Read", ["apropos hook pre"], CLAUDE_HOOK_TIMEOUT)
       hooks["PreToolUse"] = JSON::Any.new(pre_groups)
 
       post_groups = (hooks["PostToolUse"]?.try(&.as_a?)).try(&.dup) || [] of JSON::Any
@@ -201,20 +201,22 @@ module Apropos
       hash.dup
     end
 
-    # Ensure some group in `groups` carries every command in `commands`:
-    # heal a group that already owns *any* of them but is missing others (so
-    # a half-wired setup converges instead of staying stuck, or duplicating),
-    # and append a fresh `matcher`-scoped group only when no group owns any
-    # of them yet. Used by Claude Code's settings merge; Gemini CLI's still
-    # uses its own separate helpers below (`ensure_gemini_group` etc.) — this
-    # assumes a command belongs to at most *one* family. For a command wired
-    # onto more than one matcher (Layer 2's `apropos hook pre` fires on both
-    # an edit and a read), use `ensure_command_on_matcher` instead —
-    # command-ownership healing would otherwise see the command already
-    # present (from the *other* matcher's group) and never add it to this one.
+    # Ensure the group with this exact `matcher` carries every command in
+    # `commands`, healing (refreshing present commands to the current
+    # `hook_command` shape, appending whatever's missing) when that group
+    # already exists, or appending a fresh one when it doesn't.
+    #
+    # Matcher-keyed, not command-ownership-keyed: `apropos hook pre` is
+    # wired onto two matchers here ("Edit|Write" and "Read"), so a search
+    # that only asks "does some group already carry this command" can't
+    # tell the two groups apart — it would find whichever one the traversal
+    # reaches first (order in the JSON array is not guaranteed) and heal
+    # that one, potentially leaving the *other* matcher's group never
+    # created. Keying on the matcher instead means each call only ever
+    # touches the one group it's actually about.
     private def ensure_commands(groups : Array(JSON::Any), matcher : String,
                                 commands : Array(String), timeout : Int64) : Array(JSON::Any)
-      index = groups.index { |group| owns_any_command?(group, commands) }
+      index = groups.index { |group| group_matcher(group) == matcher }
       return groups + [hook_group(matcher, commands, timeout)] if index.nil?
 
       groups = groups.dup
@@ -222,32 +224,8 @@ module Apropos
       groups
     end
 
-    # Ensure the group with this exact `matcher` contains `command` —
-    # matcher-keyed, unlike `ensure_commands`' command-ownership healing,
-    # specifically so the same command can be wired onto a second matcher
-    # without the first matcher's group being mistaken for "already done".
-    private def ensure_command_on_matcher(groups : Array(JSON::Any), matcher : String,
-                                          command : String, timeout : Int64) : Array(JSON::Any)
-      index = groups.index { |group| group_matcher(group) == matcher }
-      return groups + [hook_group(matcher, [command], timeout)] if index.nil?
-      return groups if owns_any_command?(groups[index], [command])
-
-      groups = groups.dup
-      groups[index] = with_missing_hooks(groups[index], [command], timeout)
-      groups
-    end
-
     private def group_matcher(group : JSON::Any) : String?
       group.as_h?.try(&.["matcher"]?).try(&.as_s?)
-    end
-
-    private def owns_any_command?(group : JSON::Any, commands : Array(String)) : Bool
-      hooks = group.as_h?.try(&.["hooks"]?).try(&.as_a?)
-      return false unless hooks
-      hooks.any? do |hook|
-        command = hook.as_h?.try(&.["command"]?).try(&.as_s?)
-        !command.nil? && commands.includes?(command)
-      end
     end
 
     # Refresh every one of *our* commands already in `present` to the current

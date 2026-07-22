@@ -213,6 +213,29 @@ describe Apropos::Init do
       merged.scan(%("matcher": "Read")).size.should eq(1)
     end
 
+    it "does not mistake an existing Read group for the Edit|Write group to heal" do
+      seed = %({"hooks":{"PreToolUse":[{"matcher":"Read","hooks":) +
+             %([{"type":"command","command":"apropos hook pre","timeout":10}]}]}})
+      fs = InMemoryFS.new({SETTINGS_PATH => seed})
+      run_init(fs)
+      # Isolate PreToolUse: PostToolUse gets its own independent "Edit|Write"
+      # group (for apropos hook post), which would mask a missing PreToolUse
+      # one if counted across the whole file.
+      pre_section = fs.files[SETTINGS_PATH].split(%("PostToolUse"))[0]
+      pre_section.scan(%("matcher": "Read")).size.should eq(1)
+      pre_section.scan(%("matcher": "Edit|Write")).size.should eq(1)
+    end
+
+    it "refreshes a stale timeout on the Read group's own pre command too" do
+      seed = %({"hooks":{"PreToolUse":[{"matcher":"Read","hooks":) +
+             %([{"type":"command","command":"apropos hook pre","timeout":999}]}]}})
+      fs = InMemoryFS.new({SETTINGS_PATH => seed})
+      run_init(fs)
+      pre_section = fs.files[SETTINGS_PATH].split(%("PostToolUse"))[0]
+      pre_section.should_not contain(%("timeout": 999))
+      pre_section.scan(%("timeout": 10)).size.should eq(2) # Read's own pre, Edit|Write's pre
+    end
+
     it "budgets Claude Code's hook timeout in seconds" do
       fs = InMemoryFS.new
       run_init(fs)
