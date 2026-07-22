@@ -113,17 +113,27 @@ jobs:
       # `PKG_CONFIG_PATH` is unset so the linker can't find Homebrew's .dylib
       # and prefer it over the .a passed explicitly.
       - name: Build (static third-party libs, dynamic system libs)
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
         run: |
           set -e
           brew install libyaml pcre2 bdw-gc libevent openssl@3
           shards install --production
           unset PKG_CONFIG_PATH
-          yaml_lib="$(brew --prefix libyaml)/lib/libyaml.a"
-          pcre2_lib="$(brew --prefix pcre2)/lib/libpcre2-8.a"
-          gc_lib="$(brew --prefix bdw-gc)/lib/libgc.a"
-          event_lib="$(brew --prefix libevent)/lib/libevent.a"
-          ssl_lib="$(brew --prefix openssl@3)/lib/libssl.a"
-          crypto_lib="$(brew --prefix openssl@3)/lib/libcrypto.a"
+          # `brew --prefix` (no formula) is a fixed path with no lookup noise;
+          # every formula gets a `$prefix/opt/<name>` symlink regardless of
+          # version, so this avoids `brew --prefix <formula>` output (which
+          # can be polluted by unrelated tap/update warnings on stdout).
+          brew_prefix="$(brew --prefix)"
+          yaml_lib="$brew_prefix/opt/libyaml/lib/libyaml.a"
+          pcre2_lib="$brew_prefix/opt/pcre2/lib/libpcre2-8.a"
+          gc_lib="$brew_prefix/opt/bdw-gc/lib/libgc.a"
+          event_lib="$brew_prefix/opt/libevent/lib/libevent.a"
+          ssl_lib="$brew_prefix/opt/openssl@3/lib/libssl.a"
+          crypto_lib="$brew_prefix/opt/openssl@3/lib/libcrypto.a"
+          # Fail fast with a clear error if a path is wrong, rather than a
+          # confusing link (or silent dynamic-fallback) failure below.
+          ls -l "$yaml_lib" "$pcre2_lib" "$gc_lib" "$event_lib" "$ssl_lib" "$crypto_lib"
           crystal build --release \
             --link-flags "$yaml_lib $pcre2_lib $gc_lib $event_lib $ssl_lib $crypto_lib" \
             src/apropos.cr -o ${{ matrix.name }}
