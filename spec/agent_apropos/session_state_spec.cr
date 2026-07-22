@@ -4,7 +4,7 @@ private ROOT = Path["/repo"]
 private NOW  = Time.utc(2026, 7, 16, 12, 0, 0)
 
 private def session_path(id : String) : String
-  "/repo/.cache/apropos/sessions/#{id}.json"
+  "/repo/.cache/agent-apropos/sessions/#{id}.json"
 end
 
 # A filesystem whose glob returns paths that read? cannot resolve — models a

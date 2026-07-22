@@ -1,7 +1,7 @@
 require "../spec_helper"
 
 private ROOT       = Path["/repo"]
-private INDEX_PATH = "/repo/.cache/apropos/index.json"
+private INDEX_PATH = "/repo/.cache/agent-apropos/index.json"
 
 private A_PATH      = "/repo/docs/conventions/a.md"
 private DB_PATH     = "/repo/docs/conventions/db.md"

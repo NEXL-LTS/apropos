@@ -25,7 +25,7 @@ module AgentApropos
     # `--strict` promotes it.
     record Finding, severity : Symbol, location : String, message : String
 
-    # `Config::Error` (a malformed `apropos.yml`) propagates here uncaught
+    # `Config::Error` (a malformed `agent-apropos.yml`) propagates here uncaught
     # elsewhere in this module — lint is an authoring/CI command, so it fails
     # *closed* on it just like a malformed convention doc.
     def run(repo_root : Path, fs : Filesystem, strict : Bool, stdout : IO, stderr : IO) : Int32

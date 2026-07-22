@@ -2,12 +2,12 @@ require "../spec_helper"
 
 private ROOT          = Path["/repo"]
 private SETTINGS_PATH = "/repo/.claude/settings.json"
-private INDEX_PATH    = "/repo/.cache/apropos/index.json"
+private INDEX_PATH    = "/repo/.cache/agent-apropos/index.json"
 private DOC_PATH      = "/repo/docs/conventions/a.md"
 private DOC_TEXT      = "---\npaths: [\"src/**\"]\n---\n# A\n\nBody.\n"
 
-private FULL_SETTINGS = %({"hooks":{"PreToolUse":[{"hooks":[{"type":"command","command":"apropos hook pre"}]}],) +
-                        %("PostToolUse":[{"hooks":[{"type":"command","command":"apropos hook post"}]}]}})
+private FULL_SETTINGS = %({"hooks":{"PreToolUse":[{"hooks":[{"type":"command","command":"agent-apropos hook pre"}]}],) +
+                        %("PostToolUse":[{"hooks":[{"type":"command","command":"agent-apropos hook post"}]}]}})
 
 # A configurable Environment: `present` maps a command to its resolved path;
 # `outputs` maps a command to its captured `--version` stdout.
@@ -51,15 +51,15 @@ describe AgentApropos::Doctor do
       INDEX_PATH    => index_for(DOC_TEXT),
     })
     env = FakeEnv.new(
-      present: {"apropos" => "/usr/bin/apropos", "claude" => "/usr/bin/claude"},
+      present: {"agent-apropos" => "/usr/bin/agent-apropos", "claude" => "/usr/bin/claude"},
       outputs: {"claude" => "2.1.0 (Claude Code)".as(String?)})
     code, stdout = run_doctor(fs, env)
     code.should eq(0)
-    stdout.should contain("ok    hooks: PreToolUse and PostToolUse call apropos")
-    stdout.should contain("ok    apropos: on PATH at /usr/bin/apropos")
+    stdout.should contain("ok    hooks: PreToolUse and PostToolUse call agent-apropos")
+    stdout.should contain("ok    agent-apropos: on PATH at /usr/bin/agent-apropos")
     stdout.should contain("supports PreToolUse additionalContext")
     stdout.should contain("ok    index: fresh")
-    stdout.should contain("ok    cache: .cache/apropos is writable")
+    stdout.should contain("ok    cache: .cache/agent-apropos is writable")
     stdout.should contain("doctor: 0 failure(s), 0 warning(s)")
   end
 
@@ -76,44 +76,44 @@ describe AgentApropos::Doctor do
       stdout.should contain("warn  hooks: .claude/settings.json is not valid JSON")
     end
 
-    it "warns when only one event calls apropos" do
-      only_post = %({"hooks":{"PostToolUse":[{"hooks":[{"type":"command","command":"apropos hook post"}]}]}})
+    it "warns when only one event calls agent-apropos" do
+      only_post = %({"hooks":{"PostToolUse":[{"hooks":[{"type":"command","command":"agent-apropos hook post"}]}]}})
       fs = InMemoryFS.new({SETTINGS_PATH => only_post})
       _, stdout = run_doctor(fs, FakeEnv.new)
-      stdout.should contain("only PostToolUse calls apropos")
+      stdout.should contain("only PostToolUse calls agent-apropos")
     end
 
-    it "fails when no apropos hooks are wired" do
+    it "fails when no agent-apropos hooks are wired" do
       foreign = %({"hooks":{"PreToolUse":[{"hooks":[{"type":"command","command":"echo hi"}]},"weird"]}})
       fs = InMemoryFS.new({SETTINGS_PATH => foreign})
       _, stdout = run_doctor(fs, FakeEnv.new)
-      stdout.should contain("fail  hooks: no apropos hooks wired")
+      stdout.should contain("fail  hooks: no agent-apropos hooks wired")
     end
 
     it "fails when settings has no hooks section at all" do
       fs = InMemoryFS.new({SETTINGS_PATH => "{}"})
       _, stdout = run_doctor(fs, FakeEnv.new)
-      stdout.should contain("no apropos hooks wired")
+      stdout.should contain("no agent-apropos hooks wired")
     end
 
     it "fails when an event value is not an array" do
       fs = InMemoryFS.new({SETTINGS_PATH => %({"hooks":{"PreToolUse":"weird"}})})
       _, stdout = run_doctor(fs, FakeEnv.new)
-      stdout.should contain("no apropos hooks wired")
+      stdout.should contain("no agent-apropos hooks wired")
     end
 
     it "ignores a hook entry with no command field" do
       no_cmd = %({"hooks":{"PostToolUse":[{"hooks":[{"type":"command"}]}]}})
       fs = InMemoryFS.new({SETTINGS_PATH => no_cmd})
       _, stdout = run_doctor(fs, FakeEnv.new)
-      stdout.should contain("no apropos hooks wired")
+      stdout.should contain("no agent-apropos hooks wired")
     end
   end
 
-  describe "apropos check" do
-    it "warns when apropos is not on PATH" do
+  describe "agent-apropos check" do
+    it "warns when agent-apropos is not on PATH" do
       _, stdout = run_doctor(InMemoryFS.new, FakeEnv.new)
-      stdout.should contain("warn  apropos: not found on PATH")
+      stdout.should contain("warn  agent-apropos: not found on PATH")
     end
   end
 
@@ -153,12 +153,12 @@ describe AgentApropos::Doctor do
     it "warns when opencode is on PATH but the plugin is absent" do
       env = FakeEnv.new(present: {"opencode" => "/usr/bin/opencode"})
       _, stdout = run_doctor(InMemoryFS.new, env)
-      stdout.should contain("warn  opencode: plugin absent; run `apropos init --tool opencode`")
+      stdout.should contain("warn  opencode: plugin absent; run `agent-apropos init --tool opencode`")
     end
 
     it "is ok when opencode is on PATH and the plugin is present" do
       env = FakeEnv.new(present: {"opencode" => "/usr/bin/opencode"})
-      fs = InMemoryFS.new({"/repo/.opencode/plugins/apropos.js" => "// plugin"})
+      fs = InMemoryFS.new({"/repo/.opencode/plugins/agent-apropos.js" => "// plugin"})
       _, stdout = run_doctor(fs, env)
       stdout.should contain("ok    opencode: plugin wired")
     end
@@ -192,7 +192,7 @@ describe AgentApropos::Doctor do
 
     it "warns when only one of pre/post is wired under AfterTool" do
       env = FakeEnv.new(present: {"gemini" => "/usr/bin/gemini"})
-      only_pre = %({"hooks":{"AfterTool":[{"hooks":[{"type":"command","command":"apropos hook pre"}]}]}})
+      only_pre = %({"hooks":{"AfterTool":[{"hooks":[{"type":"command","command":"agent-apropos hook pre"}]}]}})
       fs = InMemoryFS.new({"/repo/.gemini/settings.json" => only_pre})
       _, stdout = run_doctor(fs, env)
       stdout.should contain("warn  gemini: AfterTool hook absent")
@@ -201,8 +201,8 @@ describe AgentApropos::Doctor do
     it "is ok when gemini is on PATH and both hooks are wired" do
       env = FakeEnv.new(present: {"gemini" => "/usr/bin/gemini"})
       wired = %({"hooks":{"AfterTool":[{"hooks":[) +
-              %({"type":"command","command":"apropos hook pre"},) +
-              %({"type":"command","command":"apropos hook post"}]}]}})
+              %({"type":"command","command":"agent-apropos hook pre"},) +
+              %({"type":"command","command":"agent-apropos hook post"}]}]}})
       fs = InMemoryFS.new({"/repo/.gemini/settings.json" => wired})
       _, stdout = run_doctor(fs, env)
       stdout.should contain("ok    gemini: AfterTool hook wired")
@@ -211,8 +211,8 @@ describe AgentApropos::Doctor do
     it "warns when pre and post are split across two different groups, not both in one" do
       env = FakeEnv.new(present: {"gemini" => "/usr/bin/gemini"})
       split = %({"hooks":{"AfterTool":[) +
-              %({"matcher":"read_file","hooks":[{"type":"command","command":"apropos hook pre"}]},) +
-              %({"matcher":"write_file|replace","hooks":[{"type":"command","command":"apropos hook post"}]}) +
+              %({"matcher":"read_file","hooks":[{"type":"command","command":"agent-apropos hook pre"}]},) +
+              %({"matcher":"write_file|replace","hooks":[{"type":"command","command":"agent-apropos hook post"}]}) +
               %(]}})
       fs = InMemoryFS.new({"/repo/.gemini/settings.json" => split})
       _, stdout = run_doctor(fs, env)
@@ -256,7 +256,7 @@ describe AgentApropos::Doctor do
       fs = ReadOnlyFS.new({SETTINGS_PATH => FULL_SETTINGS})
       code, stdout = run_doctor(fs, FakeEnv.new)
       code.should eq(1)
-      stdout.should contain("fail  cache: .cache/apropos is not writable")
+      stdout.should contain("fail  cache: .cache/agent-apropos is not writable")
     end
   end
 end

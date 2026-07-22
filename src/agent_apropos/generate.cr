@@ -12,7 +12,7 @@ module AgentApropos
   module Generate
     extend self
 
-    INDEX_RELATIVE = Path[".cache", "apropos", "index.json"]
+    INDEX_RELATIVE = Path[".cache", "agent-apropos", "index.json"]
 
     # Rebuild the index when stale and (re)write every skill wrapper, pruning
     # orphans. Progress goes to `stdout`; errors to `stderr`. Returns a process

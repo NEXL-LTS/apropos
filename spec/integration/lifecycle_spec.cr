@@ -33,8 +33,8 @@ describe "apropos init/lint/doctor/help (binary)" do
 
       code, stdout = run_apropos(binary, ["init", "--tool", "opencode", "--tool", "claude", "--repo-root", dir])
       code.should eq(0)
-      stdout.should contain(".opencode/plugins/apropos.js")
-      File.exists?(File.join(dir, ".opencode/plugins/apropos.js")).should be_true
+      stdout.should contain(".opencode/plugins/agent-apropos.js")
+      File.exists?(File.join(dir, ".opencode/plugins/agent-apropos.js")).should be_true
       File.exists?(File.join(dir, ".claude/settings.json")).should be_true
 
       _, stdout = run_apropos(binary, ["doctor", "--repo-root", dir])

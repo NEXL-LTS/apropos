@@ -18,7 +18,7 @@ module AgentApropos
   module Review
     extend self
 
-    INDEX_RELATIVE = Path[".cache", "apropos", "index.json"]
+    INDEX_RELATIVE = Path[".cache", "agent-apropos", "index.json"]
 
     # Default-branch probes when `review` gets no explicit range, tried after the
     # authoritative `origin/HEAD` symbolic ref.

@@ -5,7 +5,7 @@ require "./environment"
 require "./config"
 
 module AgentApropos
-  # `apropos init`: bootstrap the convention structure into a repo.
+  # `agent-apropos init`: bootstrap the convention structure into a repo.
   # Idempotent — safe to re-run; a scaffold file is written only when absent
   # unless `--force` is given, and the `.claude/settings.json` and `.gitignore`
   # merges are additive (foreign keys and other hooks are preserved). `--dry-run`
@@ -37,7 +37,7 @@ module AgentApropos
     # emitters land (Codex, GitHub Copilot CLI, Cursor CLI, ...).
     KNOWN_TOOLS = Set{"claude", "opencode", "gemini"}
 
-    # The context filename apropos points Gemini CLI at, so Layer 1 reads the
+    # The context filename agent-apropos points Gemini CLI at, so Layer 1 reads the
     # same root file Claude Code and OpenCode do without needing a symlink.
     GEMINI_CONTEXT_FILENAME = "AGENTS.md"
 
@@ -50,11 +50,11 @@ module AgentApropos
       dry_run : Bool = false,
       tools : Set(String)? = nil
 
-    # apropos identifies its own settings entries by this command prefix, so a
+    # agent-apropos identifies its own settings entries by this command prefix, so a
     # merge never duplicates a group it already installed.
-    APROPOS_HOOK_PREFIX = "apropos hook"
+    AGENT_APROPOS_HOOK_PREFIX = "agent-apropos hook"
 
-    CACHE_IGNORE_ENTRY = ".cache/apropos/"
+    CACHE_IGNORE_ENTRY = ".cache/agent-apropos/"
 
     # Printed once per run to point at the bootstrapping prompt — most repos
     # arrive with docs already scattered across READMEs/wikis/comments, and an
@@ -75,7 +75,7 @@ module AgentApropos
       stdout.puts NEXT_STEPS_HINT unless options.dry_run
       0
     rescue ex : AgentApropos::Error
-      stderr.puts "apropos init: #{ex.message}"
+      stderr.puts "agent-apropos init: #{ex.message}"
       1
     end
 
@@ -116,7 +116,7 @@ module AgentApropos
     end
 
     # The conventions directory, relative to `repo_root` (with `../` segments
-    # when `apropos.yml` points outside it) — `create`'s single relative-path
+    # when `agent-apropos.yml` points outside it) — `create`'s single relative-path
     # parameter needs this rather than the resolved absolute `Path` `Config`
     # returns, since it both derives the write location (joined back onto
     # `repo_root`) and the printed display string from the same value.
@@ -165,8 +165,8 @@ module AgentApropos
       sync(fs, options, stdout, path, merged_settings(existing), existing, ".claude/settings.json")
     end
 
-    # Merge apropos's PreToolUse/PostToolUse hook groups into an existing (or
-    # new) settings object, preserving every other key and hook. `apropos
+    # Merge agent-apropos's PreToolUse/PostToolUse hook groups into an existing (or
+    # new) settings object, preserving every other key and hook. `agent-apropos
     # hook pre` is wired onto both "Edit|Write" and "Read" — Layer 2 depends
     # only on the target path, which a read carries exactly like an edit, so
     # the same rule can land as early as the model's first read instead of
@@ -176,12 +176,12 @@ module AgentApropos
       hooks = (root["hooks"]?.try(&.as_h?)).try(&.dup) || {} of String => JSON::Any
 
       pre_groups = (hooks["PreToolUse"]?.try(&.as_a?)).try(&.dup) || [] of JSON::Any
-      pre_groups = ensure_commands(pre_groups, "Edit|Write", ["apropos hook pre"], CLAUDE_HOOK_TIMEOUT)
-      pre_groups = ensure_commands(pre_groups, "Read", ["apropos hook pre"], CLAUDE_HOOK_TIMEOUT)
+      pre_groups = ensure_commands(pre_groups, "Edit|Write", ["agent-apropos hook pre"], CLAUDE_HOOK_TIMEOUT)
+      pre_groups = ensure_commands(pre_groups, "Read", ["agent-apropos hook pre"], CLAUDE_HOOK_TIMEOUT)
       hooks["PreToolUse"] = JSON::Any.new(pre_groups)
 
       post_groups = (hooks["PostToolUse"]?.try(&.as_a?)).try(&.dup) || [] of JSON::Any
-      post_groups = ensure_commands(post_groups, "Edit|Write", ["apropos hook post"], CLAUDE_HOOK_TIMEOUT)
+      post_groups = ensure_commands(post_groups, "Edit|Write", ["agent-apropos hook post"], CLAUDE_HOOK_TIMEOUT)
       hooks["PostToolUse"] = JSON::Any.new(post_groups)
 
       root["hooks"] = JSON::Any.new(hooks)
@@ -206,7 +206,7 @@ module AgentApropos
     # `hook_command` shape, appending whatever's missing) when that group
     # already exists, or appending a fresh one when it doesn't.
     #
-    # Matcher-keyed, not command-ownership-keyed: `apropos hook pre` is
+    # Matcher-keyed, not command-ownership-keyed: `agent-apropos hook pre` is
     # wired onto two matchers here ("Edit|Write" and "Read"), so a search
     # that only asks "does some group already carry this command" can't
     # tell the two groups apart — it would find whichever one the traversal
@@ -264,22 +264,22 @@ module AgentApropos
     # Claude Code's hook `timeout` is seconds.
     CLAUDE_HOOK_TIMEOUT = 10_i64
 
-    # apropos identifies its own settings entries by this command prefix, so a
+    # agent-apropos identifies its own settings entries by this command prefix, so a
     # merge never duplicates a group it already installed. Still used by
     # Gemini CLI's own (separate) settings merge below.
-    private def apropos_group?(group : JSON::Any) : Bool
+    private def agent_apropos_group?(group : JSON::Any) : Bool
       hooks = group.as_h?.try(&.["hooks"]?).try(&.as_a?)
       return false unless hooks
       hooks.any? do |hook|
         command = hook.as_h?.try(&.["command"]?).try(&.as_s?)
-        !command.nil? && command.starts_with?(APROPOS_HOOK_PREFIX)
+        !command.nil? && command.starts_with?(AGENT_APROPOS_HOOK_PREFIX)
       end
     end
 
-    private def apropos_group(sub : String) : JSON::Any
+    private def agent_apropos_group(sub : String) : JSON::Any
       hook = JSON::Any.new({
         "type"    => JSON::Any.new("command"),
-        "command" => JSON::Any.new("apropos hook #{sub}"),
+        "command" => JSON::Any.new("agent-apropos hook #{sub}"),
         "timeout" => JSON::Any.new(10_i64),
       })
       JSON::Any.new({
@@ -296,7 +296,7 @@ module AgentApropos
 
     private def merged_gitignore(existing : String?) : String
       if existing.nil?
-        return "# apropos trigger index + session state (regenerated; not committed).\n" \
+        return "# agent-apropos trigger index + session state (regenerated; not committed).\n" \
                "#{CACHE_IGNORE_ENTRY}\n"
       end
       return existing if existing.each_line.any? { |line| line.strip == CACHE_IGNORE_ENTRY }
@@ -304,25 +304,25 @@ module AgentApropos
       "#{existing}#{separator}#{CACHE_IGNORE_ENTRY}\n"
     end
 
-    # Write (or update) the OpenCode Bun plugin that bridges `apropos hook pre`
-    # into OpenCode's `tool.execute.before` event (Layer 2) and `apropos hook
+    # Write (or update) the OpenCode Bun plugin that bridges `agent-apropos hook pre`
+    # into OpenCode's `tool.execute.before` event (Layer 2) and `agent-apropos hook
     # post` into `tool.execute.after` (Layer 3). Uses `sync` so a re-run is a
     # no-op when the content is identical.
     private def scaffold_opencode(repo_root : Path, fs : Filesystem, options : Options, stdout : IO) : Nil
-      path = repo_root.join(".opencode", "plugins", "apropos.js").to_s
+      path = repo_root.join(".opencode", "plugins", "agent-apropos.js").to_s
       existing = fs.read?(path)
-      sync(fs, options, stdout, path, OPENCODE_PLUGIN_JS, existing, ".opencode/plugins/apropos.js")
+      sync(fs, options, stdout, path, OPENCODE_PLUGIN_JS, existing, ".opencode/plugins/agent-apropos.js")
     end
 
     # Write (or merge into) `.gemini/settings.json`: Gemini CLI's `AfterTool`
     # event is the only one whose output schema supports injecting text back
     # into the model's context (`hookSpecificOutput.additionalContext`) — its
     # `BeforeTool` event can only override tool arguments or block the call.
-    # So both `apropos hook pre` (Layer 2) and `apropos hook post` (Layer 3)
+    # So both `agent-apropos hook pre` (Layer 2) and `agent-apropos hook post` (Layer 3)
     # run there, matched on Gemini's file-editing tools (`write_file`,
     # `replace`); `Hook.pre`'s Layer 2 matching only needs the edited file's
     # path, which `AfterTool`'s payload still carries, so Layer 2 rules still
-    # fire — just after the edit rather than before it. `apropos hook pre`
+    # fire — just after the edit rather than before it. `agent-apropos hook pre`
     # also runs there matched on `read_file` alone, so Layer 2 can land on
     # the model's first read instead of only once it (mis)writes there. Also
     # points Gemini's configurable context filename at `AGENTS.md`, so Layer
@@ -347,24 +347,24 @@ module AgentApropos
 
     # Converge to fully wired even when a prior run (or a hand-edit) left only
     # one of the two commands present: add the missing command(s) into the
-    # existing apropos-owned group rather than skipping just because *a*
-    # apropos command is already there, so a half-wired repo self-heals on
+    # existing agent-apropos-owned group rather than skipping just because *a*
+    # agent-apropos command is already there, so a half-wired repo self-heals on
     # re-run instead of needing a manual JSON edit. Matching stays on the
-    # generic "does this group carry an apropos command" predicate (not the
+    # generic "does this group carry an agent-apropos command" predicate (not the
     # matcher) so a user's own customization of the matcher (e.g. widening
     # it to cover another tool) still gets healed in place rather than
     # spawning a second, default-matcher group alongside it.
     #
     # `ensure_gemini_read_group`'s read-only group is explicitly excluded,
-    # though: it is also apropos-owned and also carries `apropos hook pre`,
+    # though: it is also agent-apropos-owned and also carries `agent-apropos hook pre`,
     # so the generic predicate alone can't tell the two groups apart — and if
     # it ran first (before this method's own group exists, e.g. from a
     # hand-edit with only that group present), it would be the first match
-    # and get "healed" with `apropos hook post` too, wiring Layer 3 onto
+    # and get "healed" with `agent-apropos hook post` too, wiring Layer 3 onto
     # `read_file` and leaving the intended write/edit group never created.
     private def ensure_gemini_group(groups : Array(JSON::Any)) : Array(JSON::Any)
-      index = groups.index { |group| apropos_group?(group) && !gemini_read_group?(group) }
-      return groups + [gemini_apropos_group] if index.nil?
+      index = groups.index { |group| agent_apropos_group?(group) && !gemini_read_group?(group) }
+      return groups + [gemini_agent_apropos_group] if index.nil?
 
       groups = groups.dup
       groups[index] = with_missing_gemini_hooks(groups[index])
@@ -395,10 +395,10 @@ module AgentApropos
     end
 
     # A second, independent group matched on `read_file` alone, carrying only
-    # `apropos hook pre` — kept separate from `ensure_gemini_group`'s
-    # write_file|replace group (rather than reusing its "does *any* apropos
+    # `agent-apropos hook pre` — kept separate from `ensure_gemini_group`'s
+    # write_file|replace group (rather than reusing its "does *any* agent-apropos
     # command already exist" check) because that check would see
-    # `apropos hook pre` already present in the *write* group and never add
+    # `agent-apropos hook pre` already present in the *write* group and never add
     # this one. Matcher-keyed instead: find (or create) the group whose
     # matcher is exactly "read_file", and ensure it has the command — and,
     # same as `with_missing_gemini_hooks`, refresh it if already present
@@ -417,17 +417,17 @@ module AgentApropos
       hash = group.as_h.dup
       present = hash["hooks"]?.try(&.as_a?) || [] of JSON::Any
       refreshed = present.map do |hook|
-        hook.as_h?.try(&.["command"]?).try(&.as_s?) == "apropos hook pre" ? gemini_hook("apropos hook pre") : hook
+        hook.as_h?.try(&.["command"]?).try(&.as_s?) == "agent-apropos hook pre" ? gemini_hook("agent-apropos hook pre") : hook
       end
-      has_pre = refreshed.any? { |hook| hook.as_h?.try(&.["command"]?).try(&.as_s?) == "apropos hook pre" }
-      hash["hooks"] = JSON::Any.new(has_pre ? refreshed : refreshed + [gemini_hook("apropos hook pre")])
+      has_pre = refreshed.any? { |hook| hook.as_h?.try(&.["command"]?).try(&.as_s?) == "agent-apropos hook pre" }
+      hash["hooks"] = JSON::Any.new(has_pre ? refreshed : refreshed + [gemini_hook("agent-apropos hook pre")])
       JSON::Any.new(hash)
     end
 
     private def gemini_read_group : JSON::Any
       JSON::Any.new({
         "matcher" => JSON::Any.new("read_file"),
-        "hooks"   => JSON::Any.new([gemini_hook("apropos hook pre")]),
+        "hooks"   => JSON::Any.new([gemini_hook("agent-apropos hook pre")]),
       })
     end
 
@@ -444,21 +444,21 @@ module AgentApropos
       JSON::Any.new(context)
     end
 
-    GEMINI_HOOK_COMMANDS = ["apropos hook pre", "apropos hook post"]
+    GEMINI_HOOK_COMMANDS = ["agent-apropos hook pre", "agent-apropos hook post"]
 
     # Gemini CLI's hook `timeout` is passed straight to JS `setTimeout()` —
     # milliseconds, not seconds like Claude Code's own hook `timeout`
-    # (`APROPOS_HOOK_PREFIX`'s callers above use a raw `10` for Claude,
+    # (`AGENT_APROPOS_HOOK_PREFIX`'s callers above use a raw `10` for Claude,
     # correctly meaning 10 seconds there). Using the same literal `10` here
     # previously gave Gemini's AfterTool hooks a 10-*millisecond* budget,
-    # well under the ~3-4ms `apropos` itself needs just to spawn — any load
+    # well under the ~3-4ms `agent-apropos` itself needs just to spawn — any load
     # at all (e.g. another CLI agent running concurrently) tips it over, so
-    # `apropos hook pre`/`post` would intermittently get SIGTERM'd and
+    # `agent-apropos hook pre`/`post` would intermittently get SIGTERM'd and
     # reported as failed. 10_000ms is the same 10-second intent, expressed
     # in Gemini's own unit.
     GEMINI_HOOK_TIMEOUT = 10_000_i64
 
-    private def gemini_apropos_group : JSON::Any
+    private def gemini_agent_apropos_group : JSON::Any
       JSON::Any.new({
         "matcher" => JSON::Any.new("write_file|replace"),
         "hooks"   => JSON::Any.new(GEMINI_HOOK_COMMANDS.map { |command| gemini_hook(command) }),
@@ -527,10 +527,10 @@ module AgentApropos
 
       - One concern per file; keep it short — tight rules get read, long ones get skimmed.
       - State **what** the rule is, **why** it exists, and a verification criterion.
-      - Add an optional `## Verify` heading; `apropos review` harvests it as a checklist item.
+      - Add an optional `## Verify` heading; `agent-apropos review` harvests it as a checklist item.
 
       Claude Code delivers Layer 2 via PreToolUse `additionalContext`; run
-      `apropos doctor` to verify the version. OpenCode delivers Layer 2 via
+      `agent-apropos doctor` to verify the version. OpenCode delivers Layer 2 via
       `tool.execute.before` and Layer 3 via `tool.execute.after`, injecting
       context with `noReply: true` through the generated plugin. Gemini CLI has
       no pre-edit context-injection event, so both Layer 2 and Layer 3 deliver
@@ -551,16 +551,16 @@ module AgentApropos
       ## Where scoped guidance lives
 
       Task- and file-scoped conventions are **not** in this file. They live in
-      `docs/conventions/` and are surfaced automatically at edit time by apropos's
+      `docs/conventions/` and are surfaced automatically at edit time by agent-apropos's
       hooks. See `docs/conventions/README.md`.
       MD
 
     SKILLS_GITKEEP = <<-MD
       # Generated skill wrappers live here.
       #
-      # `apropos generate` writes `<slug>/SKILL.md` for every `skill: true` doc in
+      # `agent-apropos generate` writes `<slug>/SKILL.md` for every `skill: true` doc in
       # docs/conventions/. Do not edit these by hand — edit the source doc instead;
-      # `apropos generate --check` fails if a wrapper drifts from its source.
+      # `agent-apropos generate --check` fails if a wrapper drifts from its source.
       MD
 
     EXAMPLE_L2 = <<-MD
@@ -599,12 +599,12 @@ module AgentApropos
 
       # Shipping a change
 
-      This is an example Layer 4 skill doc. `apropos generate` turns it into a
+      This is an example Layer 4 skill doc. `agent-apropos generate` turns it into a
       `.claude/skills/example-skill/SKILL.md` wrapper. Replace it with a real
       workflow or delete it.
       MD
 
-    # The OpenCode Bun plugin written by `apropos init --tool opencode`
+    # The OpenCode Bun plugin written by `agent-apropos init --tool opencode`
     # (or auto-detected when `opencode` is on PATH).
     #
     # Injects convention context using `client.session.prompt` with
@@ -624,9 +624,9 @@ module AgentApropos
     # The session ID is read from `input.sessionID` when available and tracked
     # through session events as a fallback.
     OPENCODE_PLUGIN_JS = <<-JS
-      // Generated by `apropos init --tool opencode` — do not edit. Re-run to regenerate.
+      // Generated by `agent-apropos init --tool opencode` — do not edit. Re-run to regenerate.
       //
-      // Bridges apropos's hook system into OpenCode using client.session.prompt
+      // Bridges agent-apropos's hook system into OpenCode using client.session.prompt
       // with noReply:true, which injects convention context into the conversation
       // without triggering an AI response.
       //
@@ -635,14 +635,14 @@ module AgentApropos
       // Both fail open: any error produces no output and never blocks an edit.
       // See docs/conventions/README.md for the layer model.
 
-      export const AproposPlugin = async ({ worktree, client }) => {
+      export const AgentAproposPlugin = async ({ worktree, client }) => {
         // Session ID tracked through events; also read from input.sessionID when
         // the plugin event exposes it (undocumented but likely present).
         let sessionID = null
 
         async function callHook(sub, payload) {
           try {
-            const proc = Bun.spawn(["apropos", "hook", sub], {
+            const proc = Bun.spawn(["agent-apropos", "hook", sub], {
               stdin: new Blob([JSON.stringify(payload)]),
               stdout: "pipe",
               cwd: worktree,

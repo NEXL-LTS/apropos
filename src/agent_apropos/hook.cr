@@ -43,8 +43,8 @@ module AgentApropos
   module Hook
     extend self
 
-    INDEX_RELATIVE = Path[".cache", "apropos", "index.json"]
-    LOG_RELATIVE   = Path[".cache", "apropos", "log"]
+    INDEX_RELATIVE = Path[".cache", "agent-apropos", "index.json"]
+    LOG_RELATIVE   = Path[".cache", "agent-apropos", "log"]
 
     # Delivered once per session, on whichever of `pre`/`post` fires
     # first — regardless of whether that particular edit matches any rule —

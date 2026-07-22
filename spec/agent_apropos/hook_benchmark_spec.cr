@@ -14,7 +14,7 @@ describe "AgentApropos::Hook performance" do
       files["/repo/#{path}"] = doc
       conventions << AgentApropos::Convention.parse(path, doc)
     end
-    files["/repo/.cache/apropos/index.json"] = AgentApropos::Index.build(conventions).to_document
+    files["/repo/.cache/agent-apropos/index.json"] = AgentApropos::Index.build(conventions).to_document
 
     fs = InMemoryFS.new(files)
     payload = {session_id: "bench", tool_name: "Edit", cwd: "/repo",

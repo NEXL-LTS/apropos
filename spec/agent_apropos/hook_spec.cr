@@ -97,8 +97,8 @@ describe AgentApropos::Hook do
       stdout.should contain(%("hookEventName":"PreToolUse"))
       stdout.should contain("Convention (docs/conventions/a.md):")
       stdout.should contain("Body of A.")
-      fs.files.has_key?("/repo/.cache/apropos/index.json").should be_true
-      fs.files.has_key?("/repo/.cache/apropos/sessions/s.json").should be_true
+      fs.files.has_key?("/repo/.cache/agent-apropos/index.json").should be_true
+      fs.files.has_key?("/repo/.cache/agent-apropos/sessions/s.json").should be_true
     end
 
     it "injects a rule at most once per session" do
@@ -151,7 +151,7 @@ describe AgentApropos::Hook do
 
     it "uses an existing index and emits nothing when the source doc is unreadable" do
       index = AgentApropos::Index.build([AgentApropos::Convention.parse("docs/conventions/a.md", A_DOC)])
-      fs = InMemoryFS.new({"/repo/.cache/apropos/index.json" => index.to_document})
+      fs = InMemoryFS.new({"/repo/.cache/agent-apropos/index.json" => index.to_document})
       code, stdout = invoke(:pre, pre_json("src/app.cr", session_id: nil), fs)
       code.should eq(0)
       stdout.should be_empty
@@ -173,7 +173,7 @@ describe AgentApropos::Hook do
       code, stdout = invoke(:pre, pre_json("src/app.cr", session_id: nil), fs)
       code.should eq(0)
       stdout.should contain("Convention (docs/conventions/a.md):")
-      fs.files.has_key?("/repo/.cache/apropos/index.json").should be_false
+      fs.files.has_key?("/repo/.cache/agent-apropos/index.json").should be_false
     end
 
     it "fails open and stays silent on an internal error" do
@@ -188,13 +188,13 @@ describe AgentApropos::Hook do
       fs = ExplodingFS.new
       code, _ = invoke(:pre, pre_json("src/app.cr"), fs, verbose: true)
       code.should eq(0)
-      fs.appended.map(&.first).should eq(["/repo/.cache/apropos/log"])
+      fs.appended.map(&.first).should eq(["/repo/.cache/agent-apropos/log"])
     end
 
     it "logs to the process directory when verbose with no override" do
       fs = ExplodingFS.new
       invoke(:pre, pre_json("src/app.cr", cwd: Dir.current), fs, override: nil, verbose: true)
-      fs.appended.first.first.should eq(File.join(Dir.current, ".cache", "apropos", "log"))
+      fs.appended.first.first.should eq(File.join(Dir.current, ".cache", "agent-apropos", "log"))
     end
 
     it "swallows a logging failure (best-effort log)" do

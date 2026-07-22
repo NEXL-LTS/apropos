@@ -10,7 +10,7 @@ module AgentApropos
   # All disk access goes through an injected `Filesystem`; the clock is injected
   # too (`now`), so persistence and pruning are unit-testable without real time.
   class SessionState
-    DIR = Path[".cache", "apropos", "sessions"]
+    DIR = Path[".cache", "agent-apropos", "sessions"]
 
     # Session files untouched for longer than this are pruned on any hook run.
     MAX_AGE = 7.days

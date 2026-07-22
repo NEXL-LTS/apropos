@@ -126,7 +126,7 @@ describe AgentApropos::CLI do
         code.should eq(0)
         err.should be_empty
         out.should contain("index: rebuilt")
-        File.exists?(File.join(dir, ".cache/apropos/index.json")).should be_true
+        File.exists?(File.join(dir, ".cache/agent-apropos/index.json")).should be_true
         File.exists?(File.join(dir, ".claude/skills/foo/SKILL.md")).should be_true
       end
     end
@@ -387,8 +387,8 @@ describe AgentApropos::CLI do
         code, out, err = run(["init", "--tool", "opencode", "--tool", "claude", "--repo-root", dir])
         code.should eq(0)
         err.should be_empty
-        out.should contain(".opencode/plugins/apropos.js")
-        File.exists?(File.join(dir, ".opencode/plugins/apropos.js")).should be_true
+        out.should contain(".opencode/plugins/agent-apropos.js")
+        File.exists?(File.join(dir, ".opencode/plugins/agent-apropos.js")).should be_true
         File.exists?(File.join(dir, ".claude/settings.json")).should be_true
       ensure
         FileUtils.rm_rf(dir)
@@ -402,7 +402,7 @@ describe AgentApropos::CLI do
         code, _, err = run(["init", "--tool", "opencode", "--repo-root", dir])
         code.should eq(0)
         err.should be_empty
-        File.exists?(File.join(dir, ".opencode/plugins/apropos.js")).should be_true
+        File.exists?(File.join(dir, ".opencode/plugins/agent-apropos.js")).should be_true
         File.exists?(File.join(dir, ".claude/settings.json")).should be_false
       ensure
         FileUtils.rm_rf(dir)

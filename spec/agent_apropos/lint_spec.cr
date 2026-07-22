@@ -45,8 +45,8 @@ describe AgentApropos::Lint do
     stdout.should contain("error  docs/conventions/bad.md:")
   end
 
-  it "fails closed on a malformed apropos.yml rather than defaulting silently" do
-    fs = InMemoryFS.new({"/repo/apropos.yml" => "key: [unterminated\n"})
+  it "fails closed on a malformed agent-apropos.yml rather than defaulting silently" do
+    fs = InMemoryFS.new({"/repo/agent-apropos.yml" => "key: [unterminated\n"})
     code, _, stderr = run_lint_full(fs)
     code.should eq(1)
     stderr.should contain("apropos lint:")

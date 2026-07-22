@@ -3,15 +3,15 @@ require "./errors"
 require "./filesystem"
 
 module AgentApropos
-  # Repo-level settings, read from `apropos.yml` at the repo root when
-  # present. Optional — a repo with no `apropos.yml` gets every default
+  # Repo-level settings, read from `agent-apropos.yml` at the repo root when
+  # present. Optional — a repo with no `agent-apropos.yml` gets every default
   # unchanged. Deliberately small: the only setting today is where the
   # convention docs live, so a repo can keep them outside its own tree (a
-  # monorepo's shared docs, or — apropos's own e2e fixture — outside the
+  # monorepo's shared docs, or — agent-apropos's own e2e fixture — outside the
   # sample git repo entirely, so a CLI agent's auto-included directory
   # listing never reveals the mechanism under test).
   #
-  # A malformed `apropos.yml` raises `Config::Error` rather than silently
+  # A malformed `agent-apropos.yml` raises `Config::Error` rather than silently
   # falling back to the default — an authoring-time mistake should never be
   # indistinguishable from "no config" — so `generate`/`lint`/`match`/
   # `review` (which already propagate `AgentApropos::Error` and fail closed) need
@@ -23,11 +23,11 @@ module AgentApropos
     class Error < AgentApropos::Error
     end
 
-    FILENAME                = "apropos.yml"
+    FILENAME                = "agent-apropos.yml"
     DEFAULT_CONVENTIONS_DIR = "docs/conventions"
 
     # The resolved conventions directory for `repo_root`: whatever
-    # `apropos.yml`'s `conventions_dir` says — resolved against `repo_root`
+    # `agent-apropos.yml`'s `conventions_dir` says — resolved against `repo_root`
     # when relative, used verbatim when absolute — or the default when the
     # file is absent or sets no `conventions_dir`.
     def conventions_dir(repo_root : Path, fs : Filesystem) : Path

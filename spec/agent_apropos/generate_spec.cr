@@ -1,7 +1,7 @@
 require "../spec_helper"
 
 private ROOT       = Path["/repo"]
-private INDEX_PATH = "/repo/.cache/apropos/index.json"
+private INDEX_PATH = "/repo/.cache/agent-apropos/index.json"
 
 private def skill_doc(name : String, description : String = "Use when #{name}") : {String, String}
   {"/repo/docs/conventions/workflows/#{name}.md",

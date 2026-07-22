@@ -5,7 +5,7 @@ private README_PATH          = "/repo/docs/conventions/README.md"
 private AGENTS_PATH          = "/repo/AGENTS.md"
 private SETTINGS_PATH        = "/repo/.claude/settings.json"
 private GITIGNORE            = "/repo/.gitignore"
-private PLUGIN_PATH          = "/repo/.opencode/plugins/apropos.js"
+private PLUGIN_PATH          = "/repo/.opencode/plugins/agent-apropos.js"
 private GEMINI_SETTINGS_PATH = "/repo/.gemini/settings.json"
 
 # A configurable Environment double: `present` is the set of CLI agent
@@ -46,9 +46,9 @@ describe AgentApropos::Init do
       fs.files.has_key?("/repo/docs/conventions/workflows/.gitkeep").should be_true
       fs.files["/repo/.claude/skills/.gitkeep"].should contain("Do not edit")
       fs.files[AGENTS_PATH].should contain("Where scoped guidance lives")
-      fs.files[SETTINGS_PATH].should contain("apropos hook pre")
-      fs.files[SETTINGS_PATH].should contain("apropos hook post")
-      fs.files[GITIGNORE].should contain(".cache/apropos/")
+      fs.files[SETTINGS_PATH].should contain("agent-apropos hook pre")
+      fs.files[SETTINGS_PATH].should contain("agent-apropos hook post")
+      fs.files[GITIGNORE].should contain(".cache/agent-apropos/")
       stdout.should contain("created  docs/conventions/README.md")
     end
 
@@ -70,7 +70,7 @@ describe AgentApropos::Init do
       fs.files[SETTINGS_PATH].should eq(settings_before)
       # Once for the Edit|Write group, once for the Read group — not duplicated
       # within either.
-      fs.files[SETTINGS_PATH].scan("apropos hook pre").size.should eq(2)
+      fs.files[SETTINGS_PATH].scan("agent-apropos hook pre").size.should eq(2)
     end
 
     it "overwrites managed scaffolds with --force but never the root file" do
@@ -91,8 +91,8 @@ describe AgentApropos::Init do
       fs.files.should be_empty
     end
 
-    it "scaffolds into apropos.yml's configured conventions_dir instead of the default" do
-      fs = InMemoryFS.new({"/repo/apropos.yml" => "conventions_dir: ../shared-conventions\n"})
+    it "scaffolds into agent-apropos.yml's configured conventions_dir instead of the default" do
+      fs = InMemoryFS.new({"/repo/agent-apropos.yml" => "conventions_dir: ../shared-conventions\n"})
       _, stdout, _ = run_init(fs)
       fs.files.has_key?("/repo/../shared-conventions/README.md").should be_true
       fs.files.has_key?("/repo/docs/conventions/README.md").should be_false
@@ -134,7 +134,7 @@ describe AgentApropos::Init do
   end
 
   describe "settings.json merge" do
-    it "preserves foreign keys and other hooks while adding apropos's" do
+    it "preserves foreign keys and other hooks while adding agent-apropos's" do
       seed = <<-JSON
         {
           "model": "opus",
@@ -150,16 +150,16 @@ describe AgentApropos::Init do
       merged = fs.files[SETTINGS_PATH]
       merged.should contain(%("model": "opus"))
       merged.should contain("echo hi")
-      merged.should contain("apropos hook pre")
-      merged.should contain("apropos hook post")
+      merged.should contain("agent-apropos hook pre")
+      merged.should contain("agent-apropos hook post")
     end
 
-    it "does not duplicate a apropos group it already installed" do
+    it "does not duplicate a agent-apropos group it already installed" do
       fs = InMemoryFS.new
-      run_init(fs) # installs apropos hooks
+      run_init(fs) # installs agent-apropos hooks
       _, stdout, _ = run_init(fs)
       stdout.should contain("current  .claude/settings.json")
-      fs.files[SETTINGS_PATH].scan("apropos hook post").size.should eq(1)
+      fs.files[SETTINGS_PATH].scan("agent-apropos hook post").size.should eq(1)
     end
 
     it "replaces a non-array event value and a group with no hooks list" do
@@ -167,16 +167,16 @@ describe AgentApropos::Init do
       fs = InMemoryFS.new({SETTINGS_PATH => seed})
       run_init(fs)
       merged = fs.files[SETTINGS_PATH]
-      merged.should contain("apropos hook pre")
-      merged.should contain("apropos hook post")
+      merged.should contain("agent-apropos hook pre")
+      merged.should contain("agent-apropos hook post")
       merged.should contain(%("matcher": "X")) # foreign group preserved
     end
 
-    it "ignores a non-apropos command hook when deciding to add its group" do
+    it "ignores a non-agent-apropos command hook when deciding to add its group" do
       seed = %({"hooks": {"PostToolUse": [{"hooks": [{"type": "command"}]}]}})
       fs = InMemoryFS.new({SETTINGS_PATH => seed})
       run_init(fs)
-      fs.files[SETTINGS_PATH].should contain("apropos hook post")
+      fs.files[SETTINGS_PATH].should contain("agent-apropos hook post")
     end
 
     it "fails closed on malformed existing settings JSON" do
@@ -193,33 +193,33 @@ describe AgentApropos::Init do
       stderr.should contain("must be a JSON object")
     end
 
-    it "wires apropos hook pre onto Read too, distinct from the Edit|Write group" do
+    it "wires agent-apropos hook pre onto Read too, distinct from the Edit|Write group" do
       fs = InMemoryFS.new
       run_init(fs)
       merged = fs.files[SETTINGS_PATH]
-      merged.scan("apropos hook pre").size.should eq(2)
+      merged.scan("agent-apropos hook pre").size.should eq(2)
       merged.should contain(%("matcher": "Read"))
       merged.should contain(%("matcher": "Edit|Write"))
     end
 
-    it "adds apropos hook pre into an existing Read group that has a different command" do
+    it "adds agent-apropos hook pre into an existing Read group that has a different command" do
       seed = %({"hooks":{"PreToolUse":[{"matcher":"Read","hooks":) +
              %([{"type":"command","command":"echo hi"}]}]}})
       fs = InMemoryFS.new({SETTINGS_PATH => seed})
       run_init(fs)
       merged = fs.files[SETTINGS_PATH]
       merged.should contain("echo hi")
-      merged.should contain("apropos hook pre")
+      merged.should contain("agent-apropos hook pre")
       merged.scan(%("matcher": "Read")).size.should eq(1)
     end
 
     it "does not mistake an existing Read group for the Edit|Write group to heal" do
       seed = %({"hooks":{"PreToolUse":[{"matcher":"Read","hooks":) +
-             %([{"type":"command","command":"apropos hook pre","timeout":10}]}]}})
+             %([{"type":"command","command":"agent-apropos hook pre","timeout":10}]}]}})
       fs = InMemoryFS.new({SETTINGS_PATH => seed})
       run_init(fs)
       # Isolate PreToolUse: PostToolUse gets its own independent "Edit|Write"
-      # group (for apropos hook post), which would mask a missing PreToolUse
+      # group (for agent-apropos hook post), which would mask a missing PreToolUse
       # one if counted across the whole file.
       pre_section = fs.files[SETTINGS_PATH].split(%("PostToolUse"))[0]
       pre_section.scan(%("matcher": "Read")).size.should eq(1)
@@ -228,7 +228,7 @@ describe AgentApropos::Init do
 
     it "refreshes a stale timeout on the Read group's own pre command too" do
       seed = %({"hooks":{"PreToolUse":[{"matcher":"Read","hooks":) +
-             %([{"type":"command","command":"apropos hook pre","timeout":999}]}]}})
+             %([{"type":"command","command":"agent-apropos hook pre","timeout":999}]}]}})
       fs = InMemoryFS.new({SETTINGS_PATH => seed})
       run_init(fs)
       pre_section = fs.files[SETTINGS_PATH].split(%("PostToolUse"))[0]
@@ -249,7 +249,7 @@ describe AgentApropos::Init do
       run_init(fs)
       run_init(fs)
       merged = fs.files[SETTINGS_PATH]
-      merged.scan("apropos hook pre").size.should eq(2)
+      merged.scan("agent-apropos hook pre").size.should eq(2)
       merged.scan(%("matcher": "Read")).size.should eq(1)
     end
   end
@@ -265,14 +265,14 @@ describe AgentApropos::Init do
       plugin.should contain("tool.execute.before")
       plugin.should contain("tool.execute.after")
       plugin.should contain("noReply: true")
-      plugin.should contain(%(["apropos", "hook", sub]))
+      plugin.should contain(%(["agent-apropos", "hook", sub]))
       # OpenCode delivers tool args in the second callback parameter; the plugin
       # must read from there (falling back to input) or Layer 2 never fires.
       plugin.should contain("async (input, output)")
       plugin.should contain("output?.args ?? input.args")
       # Layer 2 fires on OpenCode's "read" tool too, via the same "pre" hook.
       plugin.should contain(%("edit", "write", "apply_patch", "read"))
-      stdout.should contain(".opencode/plugins/apropos.js")
+      stdout.should contain(".opencode/plugins/agent-apropos.js")
     end
 
     it "wires every named tool when --tool is repeated, regardless of PATH" do
@@ -293,14 +293,14 @@ describe AgentApropos::Init do
       run_init(fs, AgentApropos::Init::Options.new(tools: Set{"opencode"}))
       plugin_before = fs.files[PLUGIN_PATH]
       _, stdout, _ = run_init(fs, AgentApropos::Init::Options.new(tools: Set{"opencode"}))
-      stdout.should contain("current  .opencode/plugins/apropos.js")
+      stdout.should contain("current  .opencode/plugins/agent-apropos.js")
       fs.files[PLUGIN_PATH].should eq(plugin_before)
     end
 
     it "reports would-create under --dry-run without writing" do
       fs = InMemoryFS.new
       _, stdout, _ = run_init(fs, AgentApropos::Init::Options.new(tools: Set{"opencode"}, dry_run: true))
-      stdout.should contain("would create .opencode/plugins/apropos.js")
+      stdout.should contain("would create .opencode/plugins/agent-apropos.js")
       fs.files.has_key?(PLUGIN_PATH).should be_false
     end
   end
@@ -345,8 +345,8 @@ describe AgentApropos::Init do
       run_init(fs, AgentApropos::Init::Options.new(tools: Set{"gemini"}))
       content = fs.files[GEMINI_SETTINGS_PATH]
       content.should contain("AfterTool")
-      content.should contain("apropos hook pre")
-      content.should contain("apropos hook post")
+      content.should contain("agent-apropos hook pre")
+      content.should contain("agent-apropos hook post")
       content.should contain("write_file|replace")
       content.should contain(%("fileName"))
       content.should contain("AGENTS.md")
@@ -367,37 +367,37 @@ describe AgentApropos::Init do
       stdout.should contain("current  .gemini/settings.json")
       fs.files[GEMINI_SETTINGS_PATH].should eq(before)
       # Once in the write_file|replace group, once in the read_file group.
-      fs.files[GEMINI_SETTINGS_PATH].scan("apropos hook pre").size.should eq(2)
+      fs.files[GEMINI_SETTINGS_PATH].scan("agent-apropos hook pre").size.should eq(2)
     end
 
     it "adds the missing command into the existing group when only pre is present" do
       seed = %({"hooks":{"AfterTool":[{"matcher":"write_file|replace","hooks":) +
-             %([{"type":"command","command":"apropos hook pre","timeout":10}]}]}})
+             %([{"type":"command","command":"agent-apropos hook pre","timeout":10}]}]}})
       fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
       run_init(fs, AgentApropos::Init::Options.new(tools: Set{"gemini"}))
       merged = fs.files[GEMINI_SETTINGS_PATH]
       # Once in the healed write_file|replace group, once in the freshly-added
       # read_file group.
-      merged.scan("apropos hook pre").size.should eq(2)
-      merged.scan("apropos hook post").size.should eq(1)
+      merged.scan("agent-apropos hook pre").size.should eq(2)
+      merged.scan("agent-apropos hook post").size.should eq(1)
       merged.scan(%("matcher": "write_file|replace")).size.should eq(1) # converged, not a second
     end
 
     it "adds the missing command into the existing group when only post is present" do
       seed = %({"hooks":{"AfterTool":[{"matcher":"write_file|replace","hooks":) +
-             %([{"type":"command","command":"apropos hook post","timeout":10}]}]}})
+             %([{"type":"command","command":"agent-apropos hook post","timeout":10}]}]}})
       fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
       run_init(fs, AgentApropos::Init::Options.new(tools: Set{"gemini"}))
       merged = fs.files[GEMINI_SETTINGS_PATH]
-      merged.scan("apropos hook pre").size.should eq(2)
-      merged.scan("apropos hook post").size.should eq(1)
+      merged.scan("agent-apropos hook pre").size.should eq(2)
+      merged.scan("agent-apropos hook post").size.should eq(1)
     end
 
-    it "wires apropos hook pre onto a read_file-matched AfterTool group too, distinct from write_file|replace" do
+    it "wires agent-apropos hook pre onto a read_file-matched AfterTool group too, distinct from write_file|replace" do
       fs = InMemoryFS.new
       run_init(fs, AgentApropos::Init::Options.new(tools: Set{"gemini"}))
       content = fs.files[GEMINI_SETTINGS_PATH]
-      content.scan("apropos hook pre").size.should eq(2)
+      content.scan("agent-apropos hook pre").size.should eq(2)
       content.should contain(%("matcher": "read_file"))
     end
 
@@ -407,10 +407,10 @@ describe AgentApropos::Init do
       fs.files[GEMINI_SETTINGS_PATH].should contain(%("timeout": 10000))
     end
 
-    it "refreshes a stale timeout on an already-wired command when healing (e.g. after an apropos upgrade)" do
+    it "refreshes a stale timeout on an already-wired command when healing (e.g. after an agent-apropos upgrade)" do
       seed = %({"hooks":{"AfterTool":[{"matcher":"write_file|replace","hooks":) +
-             %([{"type":"command","command":"apropos hook pre","timeout":10},) +
-             %({"type":"command","command":"apropos hook post","timeout":10}]}]}})
+             %([{"type":"command","command":"agent-apropos hook pre","timeout":10},) +
+             %({"type":"command","command":"agent-apropos hook post","timeout":10}]}]}})
       fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
       run_init(fs, AgentApropos::Init::Options.new(tools: Set{"gemini"}))
       merged = fs.files[GEMINI_SETTINGS_PATH]
@@ -424,36 +424,36 @@ describe AgentApropos::Init do
       run_init(fs, AgentApropos::Init::Options.new(tools: Set{"gemini"}))
       run_init(fs, AgentApropos::Init::Options.new(tools: Set{"gemini"}))
       merged = fs.files[GEMINI_SETTINGS_PATH]
-      merged.scan("apropos hook pre").size.should eq(2)
+      merged.scan("agent-apropos hook pre").size.should eq(2)
       merged.scan(%("matcher": "read_file")).size.should eq(1)
     end
 
-    it "adds apropos hook pre into an existing read_file group that has a different command" do
+    it "adds agent-apropos hook pre into an existing read_file group that has a different command" do
       seed = %({"hooks":{"AfterTool":[{"matcher":"read_file","hooks":) +
              %([{"type":"command","command":"echo hi"}]}]}})
       fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
       run_init(fs, AgentApropos::Init::Options.new(tools: Set{"gemini"}))
       merged = fs.files[GEMINI_SETTINGS_PATH]
       merged.should contain("echo hi")
-      merged.should contain("apropos hook pre")
+      merged.should contain("agent-apropos hook pre")
       merged.scan(%("matcher": "read_file")).size.should eq(1)
     end
 
     it "does not mistake an existing read_file group for the write group to heal" do
       seed = %({"hooks":{"AfterTool":[{"matcher":"read_file","hooks":) +
-             %([{"type":"command","command":"apropos hook pre","timeout":10000}]}]}})
+             %([{"type":"command","command":"agent-apropos hook pre","timeout":10000}]}]}})
       fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
       run_init(fs, AgentApropos::Init::Options.new(tools: Set{"gemini"}))
       merged = fs.files[GEMINI_SETTINGS_PATH]
       merged.scan(%("matcher": "read_file")).size.should eq(1)
       merged.scan(%("matcher": "write_file|replace")).size.should eq(1)
       read_group = merged.split(%("matcher": "write_file|replace")).first
-      read_group.should_not contain("apropos hook post")
+      read_group.should_not contain("agent-apropos hook post")
     end
 
     it "refreshes a stale timeout on the read_file group's own pre command too" do
       seed = %({"hooks":{"AfterTool":[{"matcher":"read_file","hooks":) +
-             %([{"type":"command","command":"apropos hook pre","timeout":10}]}]}})
+             %([{"type":"command","command":"agent-apropos hook pre","timeout":10}]}]}})
       fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
       run_init(fs, AgentApropos::Init::Options.new(tools: Set{"gemini"}))
       merged = fs.files[GEMINI_SETTINGS_PATH]
@@ -464,13 +464,13 @@ describe AgentApropos::Init do
     it "preserves the group's matcher and a foreign hook alongside it while healing" do
       seed = %({"hooks":{"AfterTool":[{"matcher":"custom_matcher","hooks":) +
              %([{"type":"command","command":"echo hi"},) +
-             %({"type":"command","command":"apropos hook pre"}]}]}})
+             %({"type":"command","command":"agent-apropos hook pre"}]}]}})
       fs = InMemoryFS.new({GEMINI_SETTINGS_PATH => seed})
       run_init(fs, AgentApropos::Init::Options.new(tools: Set{"gemini"}))
       merged = fs.files[GEMINI_SETTINGS_PATH]
       merged.should contain(%("matcher": "custom_matcher"))
       merged.should contain("echo hi")
-      merged.should contain("apropos hook post")
+      merged.should contain("agent-apropos hook post")
     end
 
     it "preserves foreign keys and an existing fileName list" do
@@ -518,11 +518,11 @@ describe AgentApropos::Init do
     it "appends the cache entry when missing, adding a separating newline" do
       fs = InMemoryFS.new({GITIGNORE => "/bin\n/lib"})
       run_init(fs)
-      fs.files[GITIGNORE].should eq("/bin\n/lib\n.cache/apropos/\n")
+      fs.files[GITIGNORE].should eq("/bin\n/lib\n.cache/agent-apropos/\n")
     end
 
     it "leaves the file unchanged when the entry is already present" do
-      existing = "/bin\n.cache/apropos/\n"
+      existing = "/bin\n.cache/agent-apropos/\n"
       fs = InMemoryFS.new({GITIGNORE => existing})
       _, stdout, _ = run_init(fs)
       stdout.should contain("current  .gitignore")
