@@ -105,20 +105,22 @@ jobs:
 
       # macOS has no static libc (Apple doesn't ship one), so a fully static
       # binary like the Linux legs isn't possible here. Instead, statically
-      # link the third-party deps Crystal's stdlib pulls in (yaml, pcre2, the
-      # Boehm GC, libevent) via their Homebrew .a archives, so the shipped
-      # binary depends on nothing beyond macOS system frameworks — no
-      # Homebrew required on the installing machine. `-D without_openssl`
-      # stops Crystal compiling in the LibSSL/LibCrypto bindings (and their
-      # dynamic libcrypto/libssl link) at all — apropos never requires
-      # "openssl" (only the pure-Crystal `digest/sha256`), but Crystal's
-      # default codegen still reaches for them on macOS unless this is set.
+      # link the third-party deps Crystal's stdlib pulls in via their
+      # Homebrew .a archives, so the shipped binary depends on nothing beyond
+      # macOS system frameworks — no Homebrew required on the installing
+      # machine. `digest/sha256` (used to hash convention doc contents) is
+      # backed by OpenSSL's libcrypto in Crystal's stdlib, and Crystal's own
+      # codegen resolves that dependency via pkg-config to Homebrew's dylib *before*
+      # our --link-flags are even considered — a plain positional .a path
+      # loses that race. `-Wl,-force_load` unconditionally embeds the static
+      # archive regardless of link order, and `-Wl,-dead_strip_dylibs` then
+      # drops Crystal's now-redundant dynamic reference.
       - name: Build (static third-party libs, dynamic system libs)
         env:
           HOMEBREW_NO_AUTO_UPDATE: "1"
         run: |
           set -e
-          brew install libyaml pcre2 bdw-gc libevent
+          brew install libyaml pcre2 bdw-gc libevent openssl@3
           shards install --production
           unset PKG_CONFIG_PATH
           # `brew --prefix` (no formula) is a fixed path with no lookup noise;
@@ -130,11 +132,13 @@ jobs:
           pcre2_lib="$brew_prefix/opt/pcre2/lib/libpcre2-8.a"
           gc_lib="$brew_prefix/opt/bdw-gc/lib/libgc.a"
           event_lib="$brew_prefix/opt/libevent/lib/libevent.a"
+          ssl_lib="$brew_prefix/opt/openssl@3/lib/libssl.a"
+          crypto_lib="$brew_prefix/opt/openssl@3/lib/libcrypto.a"
           # Fail fast with a clear error if a path is wrong, rather than a
           # confusing link (or silent dynamic-fallback) failure below.
-          ls -l "$yaml_lib" "$pcre2_lib" "$gc_lib" "$event_lib"
-          crystal build --release -D without_openssl \
-            --link-flags "$yaml_lib $pcre2_lib $gc_lib $event_lib" \
+          ls -l "$yaml_lib" "$pcre2_lib" "$gc_lib" "$event_lib" "$ssl_lib" "$crypto_lib"
+          crystal build --release \
+            --link-flags "$yaml_lib $pcre2_lib $gc_lib $event_lib -Wl,-force_load,$ssl_lib -Wl,-force_load,$crypto_lib -Wl,-dead_strip_dylibs" \
             src/apropos.cr -o ${{ matrix.name }}
 
       # Apple Silicon's kernel refuses to run an executable with no code
