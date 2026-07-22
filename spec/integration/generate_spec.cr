@@ -11,7 +11,7 @@ describe "apropos generate (binary)" do
   Spec.before_suite do
     status = Process.run(
       "crystal",
-      ["build", "src/apropos.cr", "-o", binary],
+      ["build", "src/agent_apropos.cr", "-o", binary],
       output: Process::Redirect::Inherit,
       error: Process::Redirect::Inherit
     )

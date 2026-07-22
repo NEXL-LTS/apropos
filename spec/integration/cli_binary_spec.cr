@@ -9,7 +9,7 @@ describe "apropos binary" do
   Spec.before_suite do
     status = Process.run(
       "crystal",
-      ["build", "src/apropos.cr", "-o", binary],
+      ["build", "src/agent_apropos.cr", "-o", binary],
       output: Process::Redirect::Inherit,
       error: Process::Redirect::Inherit
     )
@@ -24,7 +24,7 @@ describe "apropos binary" do
     stdout = IO::Memory.new
     status = Process.run(binary, ["--version"], output: stdout)
     status.exit_code.should eq(0)
-    stdout.to_s.should contain("apropos #{Apropos::VERSION}")
+    stdout.to_s.should contain("apropos #{AgentApropos::VERSION}")
   end
 
   it "prints usage with no args and exits 0" do

@@ -1,4 +1,4 @@
-# Apropos development tasks.
+# agent-apropos development tasks.
 #
 # Point the Crystal compile cache at a project-local, gitignored dir so every
 # target works regardless of whether the global ~/.cache/crystal is writable.
@@ -25,18 +25,18 @@ deps: ## Install shard dependencies
 	shards install
 
 .PHONY: build
-build: ## Build the apropos binary (debug)
-	shards build apropos
+build: ## Build the agent-apropos binary (debug)
+	shards build agent-apropos
 
 .PHONY: release
-release: ## Build the apropos binary (release)
-	crystal build --release src/apropos.cr -o bin/apropos
+release: ## Build the agent-apropos binary (release)
+	crystal build --release src/agent_apropos.cr -o bin/agent-apropos
 
 .PHONY: install
 install: release ## Build the release binary and install it to PREFIX/bin (on PATH)
 	@mkdir -p "$(PREFIX)/bin"
-	install -m 0755 bin/apropos "$(PREFIX)/bin/apropos"
-	@echo ">> installed apropos to $(PREFIX)/bin/apropos"
+	install -m 0755 bin/agent-apropos "$(PREFIX)/bin/agent-apropos"
+	@echo ">> installed agent-apropos to $(PREFIX)/bin/agent-apropos"
 
 .PHONY: spec
 spec: ## Run the spec suite
@@ -56,14 +56,14 @@ coverage: ## Run specs under kcov and enforce the coverage gate
 # prints the manual-mutation checklist instead of failing.
 #
 # Usage:
-#   make mutate SUBJECT=src/apropos/matcher.cr
+#   make mutate SUBJECT=src/agent_apropos/matcher.cr
 #   make mutate                      # lists the recommended mutation targets
 .PHONY: mutate
 mutate: .crytic/bin/crytic ## Run crytic on SUBJECT=<file> (advisory; see docs/mutation-testing.md)
 ifndef SUBJECT
-	@echo "Usage: make mutate SUBJECT=src/apropos/<module>.cr"
+	@echo "Usage: make mutate SUBJECT=src/agent_apropos/<module>.cr"
 	@echo "Recommended mutation targets (pure logic):"
-	@for m in $(MUTATION_TARGETS); do echo "  src/apropos/$$m.cr"; done
+	@for m in $(MUTATION_TARGETS); do echo "  src/agent_apropos/$$m.cr"; done
 else
 	./.crytic/bin/crytic test -s $(SUBJECT)
 endif
@@ -73,7 +73,7 @@ endif
 .crytic/bin/crytic:
 	@echo ">> installing crytic ($(CRYTIC_VERSION)) into .crytic/ ..."
 	@mkdir -p .crytic
-	@printf 'name: apropos-mutation\nversion: 0.1.0\ncrystal: ">= 1.20"\ndependencies:\n  crytic:\n    github: hanneskaeufler/crytic\n    version: %s\n' '$(CRYTIC_VERSION)' > .crytic/shard.yml
+	@printf 'name: agent-apropos-mutation\nversion: 0.1.0\ncrystal: ">= 1.20"\ndependencies:\n  crytic:\n    github: hanneskaeufler/crytic\n    version: %s\n' '$(CRYTIC_VERSION)' > .crytic/shard.yml
 	@cd .crytic && shards install || { \
 		echo ""; \
 		echo "!! crytic failed to build against this Crystal toolchain."; \
@@ -84,8 +84,8 @@ endif
 .PHONY: check
 check: lint spec ## Lint + spec (the fast local gate)
 
-# End-to-end test: stands up a sample repo wired with apropos's hooks and proves
-# apropos injects conventions and steers a real `claude` run. Local/advisory —
+# End-to-end test: stands up a sample repo wired with agent-apropos's hooks and
+# proves agent-apropos injects conventions and steers a real `claude` run. Local/advisory —
 # the live phases need the `claude` CLI + credentials and skip cleanly without
 # them, so this is intentionally NOT part of `check` or CI. See e2e/README.md.
 .PHONY: e2e

@@ -21,7 +21,7 @@ describe "apropos review/match (binary)" do
 
   Spec.before_suite do
     status = Process.run(
-      "crystal", ["build", "src/apropos.cr", "-o", binary],
+      "crystal", ["build", "src/agent_apropos.cr", "-o", binary],
       output: Process::Redirect::Inherit, error: Process::Redirect::Inherit
     )
     raise "failed to build apropos binary for integration specs" unless status.success?
