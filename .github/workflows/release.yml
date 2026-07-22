@@ -206,7 +206,11 @@ jobs:
           cp ${{ matrix.name }} ${{ matrix.name }}.sha256 \
             "$workdir/serve/NEXL-LTS/apropos/releases/latest/download/"
           sed "s#https://github.com#file://$workdir/serve#" install.sh > "$workdir/install.sh"
-          APROPOS_BIN_DIR="$workdir/bin" sh "$workdir/install.sh"
+          # /usr/bin first: on this runner PATH resolves `curl` to Homebrew's
+          # own build, which (unlike Apple's system curl) dynamically depends
+          # on the openssl@3 just uninstalled above — force Apple's curl so
+          # this step tests *our* binary's portability, not Homebrew's.
+          PATH="/usr/bin:/bin:$PATH" APROPOS_BIN_DIR="$workdir/bin" sh "$workdir/install.sh"
           "$workdir/bin/apropos" --version
 
       - name: Upload build artifact
