@@ -63,8 +63,9 @@ jobs:
 
       # Exercises install.sh's real platform-detection/download/checksum/install
       # logic end-to-end against this leg's own freshly built artifact, without
-      # needing a published release: a local file server stands in for GitHub,
-      # serving the artifact at the same relative path install.sh requests.
+      # needing a published release or any real networking: curl/wget both
+      # support file:// URLs, so a local directory stands in for GitHub at the
+      # same relative path install.sh requests, with zero code changes to it.
       - name: Test install.sh against this artifact
         run: |
           set -e
@@ -72,9 +73,7 @@ jobs:
           mkdir -p "$workdir/serve/NEXL-LTS/apropos/releases/latest/download"
           cp ${{ matrix.name }} ${{ matrix.name }}.sha256 \
             "$workdir/serve/NEXL-LTS/apropos/releases/latest/download/"
-          (cd "$workdir/serve" && python3 -m http.server 8080 >/dev/null 2>&1 &)
-          sleep 1
-          sed 's#https://github.com#http://127.0.0.1:8080#' install.sh > "$workdir/install.sh"
+          sed "s#https://github.com#file://$workdir/serve#" install.sh > "$workdir/install.sh"
           APROPOS_BIN_DIR="$workdir/bin" sh "$workdir/install.sh"
           "$workdir/bin/apropos" --version
 
@@ -158,6 +157,14 @@ jobs:
             --link-flags "$yaml_lib $pcre2_lib $gc_lib $event_lib -Wl,-force_load,$ssl_lib -Wl,-force_load,$crypto_lib -Wl,-dead_strip_dylibs" \
             src/apropos.cr -o ${{ matrix.name }}
 
+      # Proves the static link actually worked, rather than merely appearing
+      # to because this runner happens to already have these exact libs at
+      # their exact expected paths: remove them before anything below tries
+      # to run the binary. `crystal` itself (used above) may depend on some
+      # of these, hence --ignore-dependencies — we're done needing it.
+      - name: Remove the Homebrew libs used for static linking
+        run: brew uninstall --ignore-dependencies libyaml pcre2 bdw-gc libevent openssl@3
+
       # Apple Silicon's kernel refuses to run an executable with no code
       # signature at all (SIGKILL), independent of Gatekeeper/notarization.
       # An ad-hoc signature (no certificate, no Apple Developer account)
@@ -188,8 +195,9 @@ jobs:
 
       # Exercises install.sh's real platform-detection/download/checksum/install
       # logic end-to-end against this leg's own freshly built artifact, without
-      # needing a published release: a local file server stands in for GitHub,
-      # serving the artifact at the same relative path install.sh requests.
+      # needing a published release or any real networking: curl/wget both
+      # support file:// URLs, so a local directory stands in for GitHub at the
+      # same relative path install.sh requests, with zero code changes to it.
       - name: Test install.sh against this artifact
         run: |
           set -e
@@ -197,9 +205,7 @@ jobs:
           mkdir -p "$workdir/serve/NEXL-LTS/apropos/releases/latest/download"
           cp ${{ matrix.name }} ${{ matrix.name }}.sha256 \
             "$workdir/serve/NEXL-LTS/apropos/releases/latest/download/"
-          (cd "$workdir/serve" && python3 -m http.server 8080 >/dev/null 2>&1 &)
-          sleep 1
-          sed 's#https://github.com#http://127.0.0.1:8080#' install.sh > "$workdir/install.sh"
+          sed "s#https://github.com#file://$workdir/serve#" install.sh > "$workdir/install.sh"
           APROPOS_BIN_DIR="$workdir/bin" sh "$workdir/install.sh"
           "$workdir/bin/apropos" --version
 
