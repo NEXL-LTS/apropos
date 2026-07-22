@@ -3,7 +3,7 @@
 This directory is the **single source of truth** for scoped guidance — the
 judgment calls and directional practices that a linter or formatter cannot
 enforce. It is also the normative definition of the layered documentation
-structure apropos implements; apropos dogfoods that structure on itself here.
+structure agent-apropos implements; agent-apropos dogfoods that structure on itself here.
 
 Universal, always-apply rules live in the root [`AGENTS.md`](../../AGENTS.md), not
 here. Anything a tool can enforce lives in that tool (`crystal tool format`,
@@ -58,7 +58,7 @@ rule file is preferred over prose alone.
 **Layer 4 — intent skills.** For guidance triggered by the nature of a task, not
 its path or content ("doing a data migration", "touching billing"). The doc lives
 in `docs/conventions/workflows/` and opts in via `skill: true` + a `description:`
-starting with "Use when…". Skills are **generated, not hand-written**: `apropos
+starting with "Use when…". Skills are **generated, not hand-written**: `agent-apropos
 generate` emits a thin `.claude/skills/<slug>/SKILL.md` wrapper (description +
 pointer to the source doc) — or, when `conventions_dir` (see below) points
 outside the repo, the doc's full body inlined instead, since a model can't be
@@ -94,7 +94,7 @@ Combination semantics:
   tight get read; long ones get skimmed.
 - State **what** the rule is, **why** it exists (the reason is how an agent
   generalizes to edge cases), and a **verification criterion**.
-- Add an optional `## Verify` heading; `apropos review` harvests it as a review
+- Add an optional `## Verify` heading; `agent-apropos review` harvests it as a review
   checklist item.
 
 ## Classifying an instruction
@@ -113,18 +113,18 @@ For each instruction, ask in order — the most deterministic trigger wins
 
 ## The generation pipeline and review
 
-`apropos generate` walks `docs/conventions/` and compiles the frontmatter into a
-cached **trigger index** (`.cache/apropos/index.json`, gitignored, rebuilt only
-when a doc's hash changes) and the committed **skill wrappers**. `apropos generate
+`agent-apropos generate` walks `docs/conventions/` and compiles the frontmatter into a
+cached **trigger index** (`.cache/agent-apropos/index.json`, gitignored, rebuilt only
+when a doc's hash changes) and the committed **skill wrappers**. `agent-apropos generate
 --check` is the CI gate: it fails if the committed wrappers drift from what the
 current docs produce, so a stale or hand-edited `SKILL.md` blocks the merge.
 
 `docs/conventions/` is the default location, not a hardcoded one: an
-`apropos.yml` at the repo root can set `conventions_dir` to any other path,
+`agent-apropos.yml` at the repo root can set `conventions_dir` to any other path,
 relative or absolute, in or out of the repo (see the root [`README.md`](../../README.md#configuration)).
 Every command above resolves it the same way.
 
-The same frontmatter doubles as a **review manifest**: `apropos review` resolves
+The same frontmatter doubles as a **review manifest**: `agent-apropos review` resolves
 which conventions apply to a diff exactly as the edit-time hooks do — path-match
 Layer 2, content-match Layer 3 against added lines — and turns each rule's
 `## Verify` criterion into a review checklist item. Review prompts therefore carry
@@ -139,9 +139,9 @@ zero copies of the conventions; one source serves authoring, editing, and review
 - Every skill description passes the "Use when…" precision test; all `SKILL.md`
   files are generator output, never hand-edited, with no guidance duplicated from
   `docs/conventions/`.
-- `apropos generate --check` and `apropos lint` pass; nothing is silently dropped.
+- `agent-apropos generate --check` and `agent-apropos lint` pass; nothing is silently dropped.
 
 > Delivery note: this repo self-hosts. Rules here are compiled and injected by
-> `apropos` itself — Layer 2 on PreToolUse, Layer 3 on PostToolUse — via the hook
-> entries in `.claude/settings.json`. Run `make install` so the `apropos hook pre`/
-> `apropos hook post` commands resolve on PATH; `apropos doctor` checks the wiring.
+> `agent-apropos` itself — Layer 2 on PreToolUse, Layer 3 on PostToolUse — via the hook
+> entries in `.claude/settings.json`. Run `make install` so the `agent-apropos hook pre`/
+> `agent-apropos hook post` commands resolve on PATH; `agent-apropos doctor` checks the wiring.
