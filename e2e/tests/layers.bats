@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 #
-# Layered live e2e — proves apropos steers a real CLI agent, per layer.
+# Layered live e2e — proves agent-apropos steers a real CLI agent, per layer.
 #
 # Layers are grouped in one file (expected artifact + prompt + target file +
 # the register_live_tests call live together) so a layer's full intent is
@@ -10,8 +10,8 @@
 # E2E_AGENTS (helpers.bash) via register_live_tests — see there for how the
 # CLI-agent matrix is generated. Deterministic delivery of the payload -> rule
 # / generate -> skill-wrapper mapping is covered by the Crystal spec suite
-# (spec/apropos/hook_spec.cr, spec/integration/hook_spec.cr,
-# spec/apropos/generate_spec.cr, spec/integration/generate_spec.cr) — this
+# (spec/agent_apropos/hook_spec.cr, spec/integration/hook_spec.cr,
+# spec/agent_apropos/generate_spec.cr, spec/integration/generate_spec.cr) — this
 # file only proves a real CLI agent's output is actually steered.
 #
 # Each layer's expected artifact is a realistic project convention (a
@@ -25,7 +25,7 @@ bats_load_library bats-support
 bats_load_library bats-assert
 load helpers
 
-setup() { ensure_apropos; }
+setup() { ensure_agent_apropos; }
 
 # --- Layer 2 — path-scoped rule (src/**) --------------------------------------
 # Claude Code delivers via PreToolUse; OpenCode delivers via tool.execute.before
@@ -45,7 +45,7 @@ register_live_tests "Layer 2" EXPECT_L2 PROMPT_L2 src/util.py
 # Convention: don't raise the bare NotImplementedError for a deliberate stub —
 # raise StubNotImplemented (scripts/errors.py) instead, so tooling can tell a
 # deferred stub apart from a real bug. The model's natural first draft IS the
-# trigger condition, so apropos has to change what it already wrote, not just
+# trigger condition, so agent-apropos has to change what it already wrote, not just
 # decorate it.
 export EXPECT_L3="StubNotImplemented("
 export PROMPT_L3="Add a stub function sync() to scripts/jobs.py that raises NotImplementedError."
@@ -63,7 +63,7 @@ export PROMPT_L3B="Add a function get_order(conn, order_id) to db/queries.py tha
 register_live_tests "Layer 3 (path+content)" EXPECT_L3B PROMPT_L3B db/queries.py
 
 # --- Layer 4 — intent skill, delivered as a generated SKILL.md wrapper -------
-# Skills are written to .claude/skills/<name>/SKILL.md by apropos generate.
+# Skills are written to .claude/skills/<name>/SKILL.md by agent-apropos generate.
 # OpenCode reads this same path natively (no plugin required), so the same
 # generated wrapper serves both Claude Code and OpenCode.
 #

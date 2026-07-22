@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# apropos end-to-end test runner.
+# agent-apropos end-to-end test runner.
 #
-# Runs the layered bats suite in e2e/tests/. It proves, per layer, that apropos
+# Runs the layered bats suite in e2e/tests/. It proves, per layer, that agent-apropos
 # delivers its convention and steers a real CLI agent run — see e2e/README.md.
 #
 # `bats` and the bats-support/bats-assert libraries are provided by the
@@ -18,7 +18,7 @@ set -euo pipefail
 
 E2E_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$E2E_DIR/.." && pwd)"
-APROPOS_BIN="$REPO_ROOT/bin/apropos"
+AGENT_APROPOS_BIN="$REPO_ROOT/bin/agent-apropos"
 
 # bats resolves `bats_load_library` via BATS_LIB_PATH. The devcontainer image
 # sets it (ENV), but default it to the image's install location too, so the suite
@@ -43,8 +43,8 @@ fi
 # when no CLAUDE.md is reachable anywhere in the directory hierarchy, so
 # without the symlink the live Claude tests would run with zero Layer 1
 # context. All commands are idempotent.
-[ -x "$APROPOS_BIN" ] || ( cd "$REPO_ROOT" && make release >/dev/null )
-"$APROPOS_BIN" init --tool claude --tool opencode --tool gemini --claude-symlink --repo-root "$E2E_DIR/project" >/dev/null
-"$APROPOS_BIN" generate --repo-root "$E2E_DIR/project" >/dev/null
+[ -x "$AGENT_APROPOS_BIN" ] || ( cd "$REPO_ROOT" && make release >/dev/null )
+"$AGENT_APROPOS_BIN" init --tool claude --tool opencode --tool gemini --claude-symlink --repo-root "$E2E_DIR/project" >/dev/null
+"$AGENT_APROPOS_BIN" generate --repo-root "$E2E_DIR/project" >/dev/null
 
 exec bats "$@" "$E2E_DIR/tests"

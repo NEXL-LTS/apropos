@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "apropos hook post",
+            "command": "agent-apropos hook post",
             "timeout": 10
           }
         ]
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "apropos hook pre",
+            "command": "agent-apropos hook pre",
             "timeout": 10
           }
         ]

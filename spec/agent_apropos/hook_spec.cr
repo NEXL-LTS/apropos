@@ -143,7 +143,7 @@ describe AgentApropos::Hook do
     end
 
     it "emits nothing when no repo root can be resolved" do
-      input = pre_json("src/app.cr", cwd: File.tempname("apropos-norepo"))
+      input = pre_json("src/app.cr", cwd: File.tempname("agent-apropos-norepo"))
       code, stdout = invoke(:pre, input, InMemoryFS.new, override: nil)
       code.should eq(0)
       stdout.should be_empty
@@ -281,7 +281,7 @@ describe AgentApropos::Hook do
   # delivered on whichever of pre/post fires first for a session, regardless
   # of whether that particular edit matches any rule, so a model that would
   # otherwise proactively `cat` the conventions directory gets steered away
-  # from a path that has nothing to do with apropos's actual delivery
+  # from a path that has nothing to do with agent-apropos's actual delivery
   # mechanism (see the AGENTS.md discussion this followed from).
   describe "session-start notice" do
     it "fires on the first call even when no rule matches" do
