@@ -86,10 +86,14 @@ as well); if `gemini` is on PATH it wires both `agent-apropos hook pre` and
 `agent-apropos hook post` into `.gemini/settings.json`'s `AfterTool` event (Gemini's
 `BeforeTool` event has no way to inject context back into the model, so Layer
 2 degrades to firing right after the edit) and points `context.fileName` at
-`AGENTS.md`. Pass `--tool claude` / `--tool opencode` / `--tool gemini`
-(repeatable) to wire specific agents explicitly regardless of PATH. You never
-run the hooks themselves by hand — the agent calls them, and they inject the
-matching conventions as context.
+`AGENTS.md`; if `copilot` is on PATH it wires the same two commands into
+`.github/hooks/agent-apropos.json`'s `postToolUse` event, for the identical
+reason Gemini's does (Copilot's `preToolUse` event can't inject context
+either) — no bridge script, since the binary speaks Copilot's own wire
+dialect natively. Pass `--tool claude` / `--tool opencode` / `--tool gemini` /
+`--tool copilot` (repeatable) to wire specific agents explicitly regardless of
+PATH. You never run the hooks themselves by hand — the agent calls them, and
+they inject the matching conventions as context.
 
 Run `agent-apropos help` for the full mental model (also `agent-apropos help --format json` for
 the machine-readable form, or `agent-apropos help <command>`).
