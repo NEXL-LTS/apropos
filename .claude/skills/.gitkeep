@@ -1,5 +1,5 @@
 # Generated skill wrappers live here.
 #
-# `apropos generate` writes `<slug>/SKILL.md` for every `skill: true` doc in
+# `agent-apropos generate` writes `<slug>/SKILL.md` for every `skill: true` doc in
 # docs/conventions/. Do not edit these by hand — edit the source doc instead;
-# `apropos generate --check` fails if a wrapper drifts from its source.
+# `agent-apropos generate --check` fails if a wrapper drifts from its source.

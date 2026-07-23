@@ -1,21 +1,21 @@
 #!/usr/bin/env sh
-# apropos installer — resolves a GitHub release, verifies its checksum, and drops
+# agent-apropos installer — resolves a GitHub release, verifies its checksum, and drops
 # the binary on your PATH. Curl-pipe friendly:
 #
-#   curl -fsSL https://raw.githubusercontent.com/NEXL-LTS/apropos/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/NEXL-LTS/agent-apropos/main/install.sh | sh
 #
 # Overrides (environment variables):
-#   APROPOS_VERSION   release tag to install (default: latest)
-#   APROPOS_BIN_DIR   install directory      (default: $HOME/.local/bin)
-#   APROPOS_REPO      owner/repo             (default: NEXL-LTS/apropos)
+#   AGENT_APROPOS_VERSION   release tag to install (default: latest)
+#   AGENT_APROPOS_BIN_DIR   install directory      (default: $HOME/.local/bin)
+#   AGENT_APROPOS_REPO      owner/repo             (default: NEXL-LTS/agent-apropos)
 #
-# Unlike apropos's hook path, an installer must FAIL CLOSED: any error aborts with
+# Unlike agent-apropos's hook path, an installer must FAIL CLOSED: any error aborts with
 # a non-zero exit and a clear message rather than leaving a half-installed tool.
 set -eu
 
-REPO="${APROPOS_REPO:-NEXL-LTS/apropos}"
-VERSION="${APROPOS_VERSION:-latest}"
-BIN_DIR="${APROPOS_BIN_DIR:-$HOME/.local/bin}"
+REPO="${AGENT_APROPOS_REPO:-NEXL-LTS/agent-apropos}"
+VERSION="${AGENT_APROPOS_VERSION:-latest}"
+BIN_DIR="${AGENT_APROPOS_BIN_DIR:-$HOME/.local/bin}"
 
 die() {
   echo "install.sh: $*" >&2
@@ -32,15 +32,15 @@ arch="$(uname -m)"
 case "$os" in
   Linux)
     case "$arch" in
-      x86_64 | amd64) asset="apropos-linux-x86_64" ;;
-      aarch64 | arm64) asset="apropos-linux-arm64" ;;
+      x86_64 | amd64) asset="agent-apropos-linux-x86_64" ;;
+      aarch64 | arm64) asset="agent-apropos-linux-arm64" ;;
       *) die "unsupported architecture '$arch'; Linux ships x86_64/arm64 only (build from source: make install)." ;;
     esac
     ;;
   Darwin)
     case "$arch" in
-      x86_64) asset="apropos-darwin-x86_64" ;;
-      arm64) asset="apropos-darwin-arm64" ;;
+      x86_64) asset="agent-apropos-darwin-x86_64" ;;
+      arm64) asset="agent-apropos-darwin-arm64" ;;
       *) die "unsupported architecture '$arch'; macOS ships x86_64/arm64 only (build from source: make install)." ;;
     esac
     ;;
@@ -86,11 +86,11 @@ echo ">> verifying checksum ..."
 
 # --- Install -----------------------------------------------------------------
 mkdir -p "$BIN_DIR"
-install -m 0755 "$tmp/$asset" "$BIN_DIR/apropos" 2>/dev/null \
-  || { chmod 0755 "$tmp/$asset" && mv "$tmp/$asset" "$BIN_DIR/apropos"; } \
-  || die "failed to install to $BIN_DIR (set APROPOS_BIN_DIR to a writable dir, or re-run with sudo)."
+install -m 0755 "$tmp/$asset" "$BIN_DIR/agent-apropos" 2>/dev/null \
+  || { chmod 0755 "$tmp/$asset" && mv "$tmp/$asset" "$BIN_DIR/agent-apropos"; } \
+  || die "failed to install to $BIN_DIR (set AGENT_APROPOS_BIN_DIR to a writable dir, or re-run with sudo)."
 
-echo ">> installed apropos to $BIN_DIR/apropos"
+echo ">> installed agent-apropos to $BIN_DIR/agent-apropos"
 
 case ":$PATH:" in
   *":$BIN_DIR:"*) ;;
@@ -100,6 +100,6 @@ esac
 
 # Fail closed: a binary that can't execute (wrong arch, noexec mount, corruption)
 # is a broken install, not a success — surface it rather than exiting 0.
-"$BIN_DIR/apropos" --version \
-  || die "installed binary at $BIN_DIR/apropos failed to run — the install is broken (wrong architecture, a noexec mount, or a corrupt download)."
-echo ">> done. Run 'apropos help' for the mental model, or 'apropos init' to bootstrap a repo."
+"$BIN_DIR/agent-apropos" --version \
+  || die "installed binary at $BIN_DIR/agent-apropos failed to run — the install is broken (wrong architecture, a noexec mount, or a corrupt download)."
+echo ">> done. Run 'agent-apropos help' for the mental model, or 'agent-apropos init' to bootstrap a repo."

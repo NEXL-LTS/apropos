@@ -20,12 +20,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: apropos-linux-x86_64, runner: ubuntu-latest }
+          - { name: agent-apropos-linux-x86_64, runner: ubuntu-latest }
           # Native arm64 runner (free on public repos) rather than QEMU
           # emulation under docker run — same static-musl build, just a
           # different host architecture, and Docker pulls the matching
           # crystallang/crystal:1.20-alpine manifest automatically.
-          - { name: apropos-linux-arm64, runner: ubuntu-24.04-arm }
+          - { name: agent-apropos-linux-arm64, runner: ubuntu-24.04-arm }
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: write # create the release and upload the built assets
@@ -42,7 +42,7 @@ jobs:
           docker run --rm -v "$PWD":/w -w /w crystallang/crystal:1.20-alpine sh -c '
             set -e
             shards install --production
-            crystal build --release --static src/apropos.cr -o ${{ matrix.name }}
+            crystal build --release --static src/agent_apropos.cr -o ${{ matrix.name }}
           '
 
       - name: Verify static linkage
@@ -70,12 +70,12 @@ jobs:
         run: |
           set -e
           workdir="$(mktemp -d)"
-          mkdir -p "$workdir/serve/NEXL-LTS/apropos/releases/latest/download"
+          mkdir -p "$workdir/serve/NEXL-LTS/agent-apropos/releases/latest/download"
           cp ${{ matrix.name }} ${{ matrix.name }}.sha256 \
-            "$workdir/serve/NEXL-LTS/apropos/releases/latest/download/"
+            "$workdir/serve/NEXL-LTS/agent-apropos/releases/latest/download/"
           sed "s#https://github.com#file://$workdir/serve#" install.sh > "$workdir/install.sh"
-          APROPOS_BIN_DIR="$workdir/bin" sh "$workdir/install.sh"
-          "$workdir/bin/apropos" --version
+          AGENT_APROPOS_BIN_DIR="$workdir/bin" sh "$workdir/install.sh"
+          "$workdir/bin/agent-apropos" --version
 
       - name: Upload build artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -103,10 +103,10 @@ jobs:
       matrix:
         include:
           # Native Apple Silicon runner (arm64 is macos-latest since Aug 2025).
-          - { name: apropos-darwin-arm64, runner: macos-15 }
+          - { name: agent-apropos-darwin-arm64, runner: macos-15 }
           # GitHub's last committed Intel macOS image; retires ~Aug 2027 as
           # Apple/GitHub phase out x86_64 macOS runners entirely.
-          - { name: apropos-darwin-x86_64, runner: macos-15-intel }
+          - { name: agent-apropos-darwin-x86_64, runner: macos-15-intel }
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: write # create the release and upload the built assets
@@ -155,7 +155,7 @@ jobs:
           ls -l "$yaml_lib" "$pcre2_lib" "$gc_lib" "$event_lib" "$ssl_lib" "$crypto_lib"
           crystal build --release \
             --link-flags "$yaml_lib $pcre2_lib $gc_lib $event_lib -Wl,-force_load,$ssl_lib -Wl,-force_load,$crypto_lib -Wl,-dead_strip_dylibs" \
-            src/apropos.cr -o ${{ matrix.name }}
+            src/agent_apropos.cr -o ${{ matrix.name }}
 
       # Proves the static link actually worked, rather than merely appearing
       # to because this runner happens to already have these exact libs at
@@ -202,16 +202,16 @@ jobs:
         run: |
           set -e
           workdir="$(mktemp -d)"
-          mkdir -p "$workdir/serve/NEXL-LTS/apropos/releases/latest/download"
+          mkdir -p "$workdir/serve/NEXL-LTS/agent-apropos/releases/latest/download"
           cp ${{ matrix.name }} ${{ matrix.name }}.sha256 \
-            "$workdir/serve/NEXL-LTS/apropos/releases/latest/download/"
+            "$workdir/serve/NEXL-LTS/agent-apropos/releases/latest/download/"
           sed "s#https://github.com#file://$workdir/serve#" install.sh > "$workdir/install.sh"
           # /usr/bin first: on this runner PATH resolves `curl` to Homebrew's
           # own build, which (unlike Apple's system curl) dynamically depends
           # on the openssl@3 just uninstalled above — force Apple's curl so
           # this step tests *our* binary's portability, not Homebrew's.
-          PATH="/usr/bin:/bin:$PATH" APROPOS_BIN_DIR="$workdir/bin" sh "$workdir/install.sh"
-          "$workdir/bin/apropos" --version
+          PATH="/usr/bin:/bin:$PATH" AGENT_APROPOS_BIN_DIR="$workdir/bin" sh "$workdir/install.sh"
+          "$workdir/bin/agent-apropos" --version
 
       - name: Upload build artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

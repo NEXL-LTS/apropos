@@ -1,14 +1,14 @@
-# Shared helpers for the apropos e2e bats suite.
+# Shared helpers for the agent-apropos e2e bats suite.
 #
 # Loaded by each *.bats file via `load helpers`. Provides the sample-repo
-# scaffolding, the apropos-on-PATH bootstrap, the live CLI runners, and the
+# scaffolding, the agent-apropos-on-PATH bootstrap, the live CLI runners, and the
 # agent-agnostic live test matrix (register_live_tests). The per-layer
 # expected artifacts and prompts live in layers.bats so each layer's
 # expectations stay self-contained.
 #
 # Deterministic delivery checks (hook payload -> injected rule, generate ->
-# skill wrapper) live in the Crystal spec suite (spec/apropos/hook_spec.cr,
-# spec/integration/hook_spec.cr, spec/apropos/generate_spec.cr,
+# skill wrapper) live in the Crystal spec suite (spec/agent_apropos/hook_spec.cr,
+# spec/integration/hook_spec.cr, spec/agent_apropos/generate_spec.cr,
 # spec/integration/generate_spec.cr), not here — this suite only proves a
 # real CLI agent's own output is actually steered.
 
@@ -57,7 +57,7 @@ register_live_tests() {
       $run_fn \"\$$prompt_var\"
       assert grep -q \"\$$expect_var\" \"\$WORK/$target\"
     }"
-    bats_test_function --description "$layer with apropos ($name): the expected pattern lands" --tags "" -- "$fn"
+    bats_test_function --description "$layer with agent-apropos ($name): the expected pattern lands" --tags "" -- "$fn"
 
     fn="test_${slug}_without_${name_slug}"
     eval "$fn() {
@@ -66,53 +66,53 @@ register_live_tests() {
       $run_fn \"\$$prompt_var\"
       refute grep -q \"\$$expect_var\" \"\$WORK/$target\"
     }"
-    bats_test_function --description "$layer without apropos ($name): the expected pattern does not appear" --tags "" -- "$fn"
+    bats_test_function --description "$layer without agent-apropos ($name): the expected pattern does not appear" --tags "" -- "$fn"
   done
 }
 
 _e2e_dir()    { cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd; }
 _repo_root()  { cd "$(_e2e_dir)/.." && pwd; }
 
-# Ensure the apropos binary is built and resolves on PATH as the bare command
-# `apropos` (the sample's hooks call `apropos hook pre|post`). Idempotent: builds
-# only when bin/apropos is missing, then symlinks it into a stable gitignored dir.
-ensure_apropos() {
+# Ensure the agent-apropos binary is built and resolves on PATH as the bare command
+# `agent-apropos` (the sample's hooks call `agent-apropos hook pre|post`). Idempotent: builds
+# only when bin/agent-apropos is missing, then symlinks it into a stable gitignored dir.
+ensure_agent_apropos() {
   local repo bin bindir
   repo="$(_repo_root)"
-  bin="$repo/bin/apropos"
+  bin="$repo/bin/agent-apropos"
   [ -x "$bin" ] || ( cd "$repo" && make release >/dev/null )
   # Symlink into a run-scoped temp dir (auto-cleaned by bats, outside the repo)
-  # so the sample's bare `apropos hook ...` commands resolve without polluting
+  # so the sample's bare `agent-apropos hook ...` commands resolve without polluting
   # the tree or the user's ~/.local/bin.
   bindir="$BATS_RUN_TMPDIR/bin"
   mkdir -p "$bindir"
-  ln -sf "$bin" "$bindir/apropos"
+  ln -sf "$bin" "$bindir/agent-apropos"
   export PATH="$bindir:$PATH"
 }
 
 # Stand up an isolated sample repo in this test's temp dir and set $WORK.
-# Arg 1: "with" (apropos wired) or "without" (hooks + generated skills removed).
-# It is a git repo OUTSIDE this project so apropos's root resolution stops here
-# and resolves the sample's conventions, not apropos's own.
+# Arg 1: "with" (agent-apropos wired) or "without" (hooks + generated skills removed).
+# It is a git repo OUTSIDE this project so agent-apropos's root resolution stops here
+# and resolves the sample's conventions, not agent-apropos's own.
 new_sample() {
   local mode="${1:-with}"
   WORK="$BATS_TEST_TMPDIR/work"
   mkdir -p "$WORK"
   cp -r "$(_e2e_dir)/project/." "$WORK"/
-  # The copied apropos.yml still says `conventions_dir: ../conventions` —
+  # The copied agent-apropos.yml still says `conventions_dir: ../conventions` —
   # correct for the committed fixture (a fixed sibling of e2e/project/), but
   # meaningless once copied into $WORK's own throwaway tmp location. Point it
   # at an absolute path instead: the real, shared e2e/conventions/ for "with"
   # (never copied into $WORK, so a CLI agent's own auto-included directory/
-  # file listing of its workspace can never reveal it — apropos's hooks are
+  # file listing of its workspace can never reveal it — agent-apropos's hooks are
   # the only channel that can deliver it), or a directory that doesn't exist
   # for "without" (Filesystem::Real#glob on an absent base just finds
   # nothing, so Layer 2/3 never match and the model gets no convention
   # content and no discoverable directory to explore, full stop).
   if [ "$mode" = "without" ]; then
-    echo "conventions_dir: $BATS_TEST_TMPDIR/no-conventions" > "$WORK/apropos.yml"
+    echo "conventions_dir: $BATS_TEST_TMPDIR/no-conventions" > "$WORK/agent-apropos.yml"
   else
-    echo "conventions_dir: $(_e2e_dir)/conventions" > "$WORK/apropos.yml"
+    echo "conventions_dir: $(_e2e_dir)/conventions" > "$WORK/agent-apropos.yml"
   fi
   (
     cd "$WORK" \
@@ -122,11 +122,11 @@ new_sample() {
       && git add -A \
       && git commit -qm sample
   ) >/dev/null
-  apropos generate --repo-root "$WORK" >/dev/null 2>&1
+  agent-apropos generate --repo-root "$WORK" >/dev/null 2>&1
   if [ "$mode" = "without" ]; then
     printf '{"hooks":{}}\n' > "$WORK/.claude/settings.json"
     rm -rf "$WORK/.claude/skills"
-    rm -f "$WORK/.opencode/plugins/apropos.js"
+    rm -f "$WORK/.opencode/plugins/agent-apropos.js"
     printf '{"hooks":{}}\n' > "$WORK/.gemini/settings.json"
     rm -rf "$WORK/.gemini/skills"
     # Also remove the supporting module each rule points to (the decorator,
@@ -134,7 +134,7 @@ new_sample() {
     # convention rather than an arbitrary token, so it's a real, discoverable
     # code artifact in its own right — leaving it in place would let a
     # sufficiently agentic model (observed with OpenCode's build agent)
-    # adopt it on its own, independent of apropos.
+    # adopt it on its own, independent of agent-apropos.
     rm -f "$WORK/src/telemetry.py" \
           "$WORK/scripts/errors.py" \
           "$WORK/lib/registry.py" \
@@ -203,7 +203,7 @@ require_live_opencode() {
 # error), or a result flagged `is_error` (e.g. not logged in, rate limited) — is
 # treated as "claude could not run" and SKIPs the test (and marks claude unusable
 # so later live tests skip immediately instead of each paying for a failed call).
-# Only a clean run (exit 0, is_error false) returns, so a genuine "apropos did not
+# Only a clean run (exit 0, is_error false) returns, so a genuine "agent-apropos did not
 # influence the output" still fails loudly at the assertion.
 run_claude() {  # arg: prompt
   local dbg="$BATS_TEST_TMPDIR/hooks.log"
@@ -240,7 +240,7 @@ run_claude() {  # arg: prompt
 }
 
 # Run opencode non-interactively in $WORK. The plugin at
-# .opencode/plugins/apropos.js bridges the hook calls; apropos must be on PATH.
+# .opencode/plugins/agent-apropos.js bridges the hook calls; agent-apropos must be on PATH.
 # Stdout is written to $WORK/_oc_out.txt; a nonzero exit skips the test.
 run_opencode() {  # arg: prompt
   local model_args=()
@@ -284,7 +284,7 @@ require_live_gemini() {
 }
 
 # Run gemini non-interactively in $WORK. .gemini/settings.json's AfterTool
-# hooks bridge the calls into `apropos hook pre`/`apropos hook post`; apropos
+# hooks bridge the calls into `agent-apropos hook pre`/`agent-apropos hook post`; agent-apropos
 # must be on PATH. --approval-mode auto_edit auto-approves edit tools so a
 # headless run doesn't hang on a confirmation prompt (matching
 # require_live_gemini's probe above). --skip-trust is required separately —

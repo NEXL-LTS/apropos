@@ -4,7 +4,7 @@ require "file_utils"
 # End-to-end review/match against the built binary over a real git repo — the one
 # place the git process boundary and real stdin are exercised together. The pure
 # resolution logic is unit-tested with a fake git (review_spec).
-private def run_apropos(binary : String, args : Array(String), stdin : String = "") : {Int32, String}
+private def run_agent_apropos(binary : String, args : Array(String), stdin : String = "") : {Int32, String}
   stdout = IO::Memory.new
   status = Process.run(binary, args, input: IO::Memory.new(stdin), output: stdout)
   {status.exit_code, stdout.to_s}
@@ -16,15 +16,15 @@ private def git_setup(dir : String, args : Array(String)) : Nil
   raise "git #{args.join(' ')} failed" unless status.success?
 end
 
-describe "apropos review/match (binary)" do
-  binary = File.join(Dir.tempdir, "apropos-review-#{Process.pid}")
+describe "agent-apropos review/match (binary)" do
+  binary = File.join(Dir.tempdir, "agent-apropos-review-#{Process.pid}")
 
   Spec.before_suite do
     status = Process.run(
-      "crystal", ["build", "src/apropos.cr", "-o", binary],
+      "crystal", ["build", "src/agent_apropos.cr", "-o", binary],
       output: Process::Redirect::Inherit, error: Process::Redirect::Inherit
     )
-    raise "failed to build apropos binary for integration specs" unless status.success?
+    raise "failed to build agent-apropos binary for integration specs" unless status.success?
   end
 
   Spec.after_suite do
@@ -32,7 +32,7 @@ describe "apropos review/match (binary)" do
   end
 
   it "matches a path and reviews a git range end to end" do
-    dir = File.tempname("apropos-review-repo")
+    dir = File.tempname("agent-apropos-review-repo")
     begin
       Dir.mkdir_p(File.join(dir, "docs/conventions"))
       Dir.mkdir_p(File.join(dir, "app/models"))
@@ -47,11 +47,11 @@ describe "apropos review/match (binary)" do
       git_setup(dir, ["add", "-A"])
       git_setup(dir, ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "change"])
 
-      code, matched = run_apropos(binary, ["match", "--repo-root", dir, "app/models/user.cr"])
+      code, matched = run_agent_apropos(binary, ["match", "--repo-root", dir, "app/models/user.cr"])
       code.should eq(0)
       matched.should eq("docs/conventions/models.md\n")
 
-      code, manifest = run_apropos(binary, ["review", "--repo-root", dir, "main...HEAD"])
+      code, manifest = run_agent_apropos(binary, ["review", "--repo-root", dir, "main...HEAD"])
       code.should eq(0)
       manifest.should contain("## app/models/user.cr")
       manifest.should contain("- [ ] Stays thin")

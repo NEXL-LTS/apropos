@@ -1,17 +1,17 @@
-# apropos end-to-end test
+# agent-apropos end-to-end test
 
-A [bats-core](https://github.com/bats-core/bats-core) suite that runs apropos
+A [bats-core](https://github.com/bats-core/bats-core) suite that runs agent-apropos
 against live Claude Code and OpenCode by default (Gemini CLI is supported but
 opt-in — see [Options](#options) — since even a healthy Gemini call has been
 observed taking 30-60s, and a real edit-task prompt over 180s) and asserts
 what the model actually writes. It is organized **by layer**; each layer runs
-the same with-apropos / without-apropos contrast for every enabled CLI.
+the same with-agent-apropos / without-agent-apropos contrast for every enabled CLI.
 
 ## Structure
 
 ```
 tests/
-  helpers.bash  # sample scaffolding, apropos-on-PATH, agent registry, live runners
+  helpers.bash  # sample scaffolding, agent-apropos-on-PATH, agent registry, live runners
   layers.bats   # all layers, each grouped with its expected artifact/prompt/target
 ```
 
@@ -34,19 +34,19 @@ artifact is attributable to exactly one convention.
 
 The rule docs themselves live in [`conventions/`](./conventions), a sibling
 of `project/` — outside the sample's own git repo entirely, pointed at via
-`project/apropos.yml`'s `conventions_dir`. That's not incidental: a CLI
+`project/agent-apropos.yml`'s `conventions_dir`. That's not incidental: a CLI
 agent's own auto-included directory/file listing of its workspace can only
 ever show what's inside the workspace, so if the docs lived under
 `project/` a sufficiently curious model could discover them (and the fact
 that it's being tested) by exploring its own file tree — regardless of
-whether apropos's hooks are wired at all. Keeping them external means the
-*only* channel that can deliver a rule's content into a live run is apropos's
+whether agent-apropos's hooks are wired at all. Keeping them external means the
+*only* channel that can deliver a rule's content into a live run is agent-apropos's
 hooks. `new_sample()` (`tests/helpers.bash`) points the copied sample's
-`apropos.yml` at the real `conventions/` for "with" and at a directory that
+`agent-apropos.yml` at the real `conventions/` for "with" and at a directory that
 doesn't exist for "without" — Layer 2/3 then simply have nothing to match,
 and there's nothing to find by exploring either. The module each rule points
 to (the decorator, exception, registry, audit wrapper) is still stripped
-from `project/` in the without-apropos control, since that one *is* reachable
+from `project/` in the without-agent-apropos control, since that one *is* reachable
 by exploring the sample's own tree.
 
 | Layer | Trigger | Convention | Expected artifact | Target file |
@@ -69,8 +69,8 @@ just skip cleanly, which can look like a pass at a glance.
 
 `bats` and its `bats-support`/`bats-assert` libraries ship in the devcontainer
 image (resolved via `BATS_LIB_PATH`), so nothing is fetched at run time.
-Before invoking `bats`, `run.sh` runs `apropos init --tool claude --tool
-opencode --tool gemini` and `apropos generate` against `project/` itself, so
+Before invoking `bats`, `run.sh` runs `agent-apropos init --tool claude --tool
+opencode --tool gemini` and `agent-apropos generate` against `project/` itself, so
 its hook wiring (`.claude/`, `.opencode/`, `.gemini/`) is always freshly
 generated rather than committed (see `project/.gitignore`) — that way the
 fixture is fully wired regardless of which agents happen to be installed on
@@ -80,18 +80,18 @@ extra flags pass through, e.g. `bash e2e/run.sh --filter 'Layer 2'`.
 ## The two tests per layer, per agent
 
 Each test copies the sample into an isolated temp git repo (bats'
-`BATS_TEST_TMPDIR`, outside this repo) with a freshly built `apropos` on PATH.
+`BATS_TEST_TMPDIR`, outside this repo) with a freshly built `agent-apropos` on PATH.
 For each layer, every agent in `E2E_AGENTS` runs the same live pair:
 
-1. **with apropos (live).** Run the CLI against the wired sample and assert the
+1. **with agent-apropos (live).** Run the CLI against the wired sample and assert the
    expected artifact lands in the edited file.
-2. **without apropos (live control).** Run the same prompt with apropos removed
+2. **without agent-apropos (live control).** Run the same prompt with agent-apropos removed
    and assert the expected artifact does **not** appear.
 
 Deterministic delivery — that a hook payload maps to the right rule, or that
 `generate` writes the right skill wrapper — is covered by the Crystal spec
-suite (`spec/apropos/hook_spec.cr`, `spec/integration/hook_spec.cr`,
-`spec/apropos/generate_spec.cr`, `spec/integration/generate_spec.cr`), not
+suite (`spec/agent_apropos/hook_spec.cr`, `spec/integration/hook_spec.cr`,
+`spec/agent_apropos/generate_spec.cr`, `spec/integration/generate_spec.cr`), not
 here. This suite only exists to prove a real CLI agent's own output is
 actually steered.
 

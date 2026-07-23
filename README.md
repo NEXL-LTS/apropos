@@ -1,19 +1,19 @@
-# apropos
+# agent-apropos
 
 **Context injection for AI CLI coding tools — deliver the right documentation at
 exactly the right moment.**
 
 *Apropos* — apt, pertinent, timely; said or done at exactly the right moment.
-That's the whole design brief: apropos is a single deterministic binary that
+That's the whole design brief: agent-apropos is a single deterministic binary that
 keeps a layered documentation structure working. It compiles convention-doc
 frontmatter into a trigger index, generates skill wrappers, serves as a hook
 handler for supported CLI agents that injects path- and construct-scoped rules
 at edit time, and resolves the conventions that apply to a diff for review.
 
-One large always-loaded instruction file gets skimmed and forgotten. apropos
+One large always-loaded instruction file gets skimmed and forgotten. agent-apropos
 keeps the guidance small and just-in-time: rules live in
 [`docs/conventions/`](./docs/conventions/) as markdown with YAML frontmatter,
-and apropos delivers each one exactly when the file or construct it governs is
+and agent-apropos delivers each one exactly when the file or construct it governs is
 being touched — nothing sooner, nothing later. It makes no LLM calls —
 triggering is deterministic — and ships as a static Linux / dynamically-linked
 macOS binary.
@@ -30,12 +30,12 @@ macOS binary.
 ## Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/NEXL-LTS/apropos/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/NEXL-LTS/agent-apropos/main/install.sh | sh
 ```
 
 The installer resolves the latest release, verifies its SHA256 checksum, and
-installs `apropos` to `$HOME/.local/bin` (override with `APROPOS_BIN_DIR`; pin a tag
-with `APROPOS_VERSION`). Ships fully static Linux x86_64/arm64 binaries and
+installs `agent-apropos` to `$HOME/.local/bin` (override with `AGENT_APROPOS_BIN_DIR`; pin a tag
+with `AGENT_APROPOS_VERSION`). Ships fully static Linux x86_64/arm64 binaries and
 dynamically linked macOS x86_64/arm64 binaries (the installer picks the right
 one from `uname -s`/`uname -m`); Windows is on the roadmap. The macOS binaries
 depend on nothing beyond system frameworks — no Homebrew required — since the
@@ -50,32 +50,32 @@ make install          # builds the release binary into $PREFIX/bin (default ~/.l
 ### Pinning a version in another repo's Dockerfile
 
 ```dockerfile
-ARG APROPOS_VERSION=v0.2.0
+ARG AGENT_APROPOS_VERSION=v0.2.0
 
-RUN curl -fsSL "https://raw.githubusercontent.com/NEXL-LTS/apropos/${APROPOS_VERSION}/install.sh" -o /tmp/install.sh \
-    && APROPOS_VERSION=${APROPOS_VERSION} APROPOS_BIN_DIR=/usr/local/bin sh /tmp/install.sh \
+RUN curl -fsSL "https://raw.githubusercontent.com/NEXL-LTS/agent-apropos/${AGENT_APROPOS_VERSION}/install.sh" -o /tmp/install.sh \
+    && AGENT_APROPOS_VERSION=${AGENT_APROPOS_VERSION} AGENT_APROPOS_BIN_DIR=/usr/local/bin sh /tmp/install.sh \
     && rm /tmp/install.sh
 
-RUN apropos --version
+RUN agent-apropos --version
 ```
 
 ## Quickstart
 
 ```sh
-apropos init                # bootstrap docs/conventions/, hook wiring, .gitignore
+agent-apropos init                # bootstrap docs/conventions/, hook wiring, .gitignore
 $EDITOR docs/conventions/  # write rules (see docs/conventions/README.md)
-apropos generate            # compile the index + skill wrappers
-apropos lint                # validate the structure
-apropos doctor              # check the environment and hook wiring
+agent-apropos generate            # compile the index + skill wrappers
+agent-apropos lint                # validate the structure
+agent-apropos doctor              # check the environment and hook wiring
 ```
 
-`apropos init` wires hooks for whichever CLI agents are in play. By default it
+`agent-apropos init` wires hooks for whichever CLI agents are in play. By default it
 auto-detects: if `claude` is on PATH it wires two hooks into
-`.claude/settings.json` (`apropos hook pre` → PreToolUse → Layer 2,
-path-scoped; `apropos hook post` → PostToolUse → Layer 3, construct-scoped);
+`.claude/settings.json` (`agent-apropos hook pre` → PreToolUse → Layer 2,
+path-scoped; `agent-apropos hook post` → PostToolUse → Layer 3, construct-scoped);
 if `opencode` is on PATH it generates the OpenCode plugin bridge instead (or
-as well); if `gemini` is on PATH it wires both `apropos hook pre` and
-`apropos hook post` into `.gemini/settings.json`'s `AfterTool` event (Gemini's
+as well); if `gemini` is on PATH it wires both `agent-apropos hook pre` and
+`agent-apropos hook post` into `.gemini/settings.json`'s `AfterTool` event (Gemini's
 `BeforeTool` event has no way to inject context back into the model, so Layer
 2 degrades to firing right after the edit) and points `context.fileName` at
 `AGENTS.md`. Pass `--tool claude` / `--tool opencode` / `--tool gemini`
@@ -83,8 +83,8 @@ as well); if `gemini` is on PATH it wires both `apropos hook pre` and
 run the hooks themselves by hand — the agent calls them, and they inject the
 matching conventions as context.
 
-Run `apropos help` for the full mental model (also `apropos help --format json` for
-the machine-readable form, or `apropos help <command>`).
+Run `agent-apropos help` for the full mental model (also `agent-apropos help --format json` for
+the machine-readable form, or `agent-apropos help <command>`).
 
 ## Bootstrapping from an existing codebase
 
@@ -92,10 +92,10 @@ Most repos aren't starting from zero — the conventions already exist, just
 scattered across a README, a wiki, ADRs, or tribal knowledge in someone's
 head. Rather than writing `docs/conventions/` from scratch, have your coding
 agent survey what's already there and sort it into the four layers. After
-`apropos init`, hand it a prompt along these lines:
+`agent-apropos init`, hand it a prompt along these lines:
 
 ```
-Read docs/conventions/README.md to learn apropos's four-layer convention
+Read docs/conventions/README.md to learn agent-apropos's four-layer convention
 model (root file, path-scoped, construct-scoped, intent skills). Then survey
 this repo's existing documentation — README, wiki exports, ADRs, code
 comments — plus any patterns you can infer from the code itself.
@@ -109,10 +109,10 @@ truly universal.
 
 Don't invent conventions that aren't actually followed here — only capture
 what's real. List every file you created or changed so I can review it, then
-run `apropos generate && apropos lint` and fix anything that's flagged.
+run `agent-apropos generate && agent-apropos lint` and fix anything that's flagged.
 ```
 
-`apropos init` prints a pointer to this section as a reminder.
+`agent-apropos init` prints a pointer to this section as a reminder.
 
 ### Graduating conventions into tooling
 
@@ -157,10 +157,10 @@ for the full model:
 ```mermaid
 flowchart LR
     Docs["docs/conventions/*.md\n(rules + YAML frontmatter)"]
-    Docs -->|apropos generate| Index["trigger index +\nskill wrappers"]
+    Docs -->|agent-apropos generate| Index["trigger index +\nskill wrappers"]
 
-    Index --> Pre["PreToolUse hook\napropos hook pre"]
-    Index --> Post["PostToolUse hook\napropos hook post"]
+    Index --> Pre["PreToolUse hook\nagent-apropos hook pre"]
+    Index --> Post["PostToolUse hook\nagent-apropos hook post"]
     Index --> Skill["skill match"]
     Root["AGENTS.md / CLAUDE.md"] --> L1
 
@@ -171,7 +171,7 @@ flowchart LR
 
     L1 & L2 & L3 & L4 --> Ctx(["context injected\ninto the agent"])
 
-    Diff["git diff"] -->|apropos review| Manifest["review manifest\n(conventions that apply)"]
+    Diff["git diff"] -->|agent-apropos review| Manifest["review manifest\n(conventions that apply)"]
     Index --> Manifest
 ```
 
@@ -182,7 +182,7 @@ flowchart LR
 | 3 Construct-scoped | An API / code construct | Written **content** (regex) | PostToolUse hook |
 | 4 Intent skills | Task-nature guidance | Semantic skill match | Generated `SKILL.md` |
 
-`apropos generate` compiles the frontmatter in `docs/conventions/` into a cached
+`agent-apropos generate` compiles the frontmatter in `docs/conventions/` into a cached
 trigger index and committed skill wrappers. At edit time, the hooks look up the
 matching rules and inject them. For review, the same frontmatter resolves which
 conventions apply to a diff, so review prompts carry zero copies of the rules.
@@ -191,7 +191,7 @@ conventions apply to a diff, so review prompts carry zero copies of the rules.
 
 Conventions live in `docs/conventions/` by default — nothing to configure for
 the common case. To keep them somewhere else (a monorepo's docs shared across
-packages, for instance), drop an `apropos.yml` at the repo root:
+packages, for instance), drop an `agent-apropos.yml` at the repo root:
 
 ```yaml
 conventions_dir: ../shared-conventions   # relative to repo root, or absolute
@@ -209,14 +209,14 @@ content directly instead.
 
 | Command | Purpose |
 | --- | --- |
-| `apropos init` | Bootstrap the convention structure into a repo (idempotent; `--tool claude\|opencode\|gemini` — repeatable, auto-detects by default — plus `--force`, `--example`, `--claude-symlink`, `--dry-run`). |
-| `apropos generate` | Compile frontmatter into the trigger index and skill wrappers. `--check` is the CI drift gate. |
-| `apropos hook pre` / `hook post` | Hook handlers for the wired CLI agent (Layer 2 / Layer 3). Fail open — never block an edit. |
-| `apropos match <paths>` | Resolve the conventions applying to given files (`--format paths\|json\|full`). |
-| `apropos review [range]` | Resolve conventions for a git diff range as a review manifest (`--format md\|json`). |
-| `apropos lint` | Validate frontmatter, skill descriptions, root-file budget, and generated-artifact freshness (`--strict`). |
-| `apropos doctor` | Check hook wiring, agent version/capability support, index freshness, and cache writability. |
-| `apropos help` | The dual-audience mental model (human and agent), single-sourced with `--format json`. |
+| `agent-apropos init` | Bootstrap the convention structure into a repo (idempotent; `--tool claude\|opencode\|gemini` — repeatable, auto-detects by default — plus `--force`, `--example`, `--claude-symlink`, `--dry-run`). |
+| `agent-apropos generate` | Compile frontmatter into the trigger index and skill wrappers. `--check` is the CI drift gate. |
+| `agent-apropos hook pre` / `hook post` | Hook handlers for the wired CLI agent (Layer 2 / Layer 3). Fail open — never block an edit. |
+| `agent-apropos match <paths>` | Resolve the conventions applying to given files (`--format paths\|json\|full`). |
+| `agent-apropos review [range]` | Resolve conventions for a git diff range as a review manifest (`--format md\|json`). |
+| `agent-apropos lint` | Validate frontmatter, skill descriptions, root-file budget, and generated-artifact freshness (`--strict`). |
+| `agent-apropos doctor` | Check hook wiring, agent version/capability support, index freshness, and cache writability. |
+| `agent-apropos help` | The dual-audience mental model (human and agent), single-sourced with `--format json`. |
 
 Every command takes `--help`, `--repo-root <dir>` (default: walk up to the nearest
 `.git`), and documents its exit codes.
@@ -239,10 +239,10 @@ Every command takes `--help`, `--repo-root <dir>` (default: walk up to the neare
 
 - No Cursor `.mdc` / Copilot `.instructions.md` output — the frontmatter is
   designed so these are pure additional emitters later.
-- No enforcement of code style — that belongs in linters/formatters, which apropos
+- No enforcement of code style — that belongs in linters/formatters, which agent-apropos
   does not replace.
 - No LLM calls; no daemon/watch mode (every invocation is a fast one-shot).
-- No hook management beyond its own entries: apropos edits only the hook entries it
+- No hook management beyond its own entries: agent-apropos edits only the hook entries it
   owns in `.claude/settings.json`, marked and idempotent.
 
 ## Roadmap
@@ -254,8 +254,8 @@ PR comments).
 
 ## Development
 
-This repo dogfoods the standard on itself — `docs/conventions/` holds apropos's own
-scoped guidance, delivered by apropos's own hooks. Use `make`:
+This repo dogfoods the standard on itself — `docs/conventions/` holds agent-apropos's own
+scoped guidance, delivered by agent-apropos's own hooks. Use `make`:
 
 - `make deps` — install shard dependencies
 - `make build` — build the debug binary; `make release` for the release build

@@ -1,6 +1,0 @@
-# Conventions live outside this sample's own git repo (see ../conventions) so
-# a CLI agent's auto-included directory/file listing of its own workspace
-# never reveals the mechanism apropos's e2e suite is testing. See
-# e2e/tests/helpers.bash's new_sample() for how live tests point this at
-# either the real docs ("with") or a directory that doesn't exist ("without").
-conventions_dir: ../conventions

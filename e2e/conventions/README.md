@@ -1,6 +1,6 @@
 # Conventions
 
-Scoped guidance for this sample repo, delivered just-in-time by apropos.
+Scoped guidance for this sample repo, delivered just-in-time by agent-apropos.
 
 | Layer | For | Trigger | Delivered by |
 | --- | --- | --- | --- |
