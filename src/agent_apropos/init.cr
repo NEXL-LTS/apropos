@@ -60,10 +60,10 @@ module AgentApropos
     # arrive with docs already scattered across READMEs/wikis/comments, and an
     # agent can sort those into layers faster than a human writing from scratch.
     # A fully-qualified URL, not a relative "README.md#..." — this section
-    # lives in *apropos's own* README, not the target repo's, and terminals
+    # lives in *agent-apropos's own* README, not the target repo's, and terminals
     # only auto-hyperlink absolute URLs.
     NEXT_STEPS_HINT = "next     have your agent bootstrap docs/conventions/ from your existing " \
-                      "docs — see https://github.com/NEXL-LTS/apropos#bootstrapping-from-an-existing-codebase"
+                      "docs — see https://github.com/NEXL-LTS/agent-apropos#bootstrapping-from-an-existing-codebase"
 
     def run(repo_root : Path, fs : Filesystem, env : Environment, options : Options, stdout : IO, stderr : IO) : Int32
       tools = resolve_tools(env, options.tools)
@@ -220,7 +220,7 @@ module AgentApropos
     # touches the group(s) it's actually about.
     #
     # A given matcher can have more than one group already — e.g. a legacy
-    # apropos version (or a hand-edit) put its own command in a separate
+    # agent-apropos version (or a hand-edit) put its own command in a separate
     # "Edit|Write" group instead of a foreign hook's — so presence is
     # checked across *every* matching group, not just the first: otherwise
     # healing the foreign hook's group would add a second copy of a command

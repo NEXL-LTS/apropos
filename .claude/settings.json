@@ -33,7 +33,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "apropos hook pre",
+            "command": "agent-apropos hook pre",
             "timeout": 10
           }
         ]

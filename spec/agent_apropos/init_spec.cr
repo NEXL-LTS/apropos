@@ -55,7 +55,7 @@ describe AgentApropos::Init do
     it "points at the bootstrapping prompt with a full URL, not a relative path" do
       fs = InMemoryFS.new
       _, stdout, _ = run_init(fs)
-      stdout.should contain("https://github.com/NEXL-LTS/apropos#bootstrapping-from-an-existing-codebase")
+      stdout.should contain("https://github.com/NEXL-LTS/agent-apropos#bootstrapping-from-an-existing-codebase")
     end
 
     it "is idempotent — a second run changes nothing" do
@@ -87,7 +87,7 @@ describe AgentApropos::Init do
       _, stdout, _ = run_init(fs, AgentApropos::Init::Options.new(dry_run: true))
       stdout.should contain("would create docs/conventions/README.md")
       stdout.should contain("would create .claude/settings.json")
-      stdout.should_not contain("https://github.com/NEXL-LTS/apropos#bootstrapping-from-an-existing-codebase")
+      stdout.should_not contain("https://github.com/NEXL-LTS/agent-apropos#bootstrapping-from-an-existing-codebase")
       fs.files.should be_empty
     end
 
@@ -163,21 +163,21 @@ describe AgentApropos::Init do
     end
 
     it "does not add an already-installed command into a second group sharing the same matcher" do
-      # Legacy layout: an older apropos version (or a hand-edit) put its own
-      # command in a *separate* "Edit|Write" group instead of the foreign
+      # Legacy layout: an older agent-apropos version (or a hand-edit) put its
+      # own command in a *separate* "Edit|Write" group instead of the foreign
       # hook's group. `ensure_commands` must search every group with this
       # matcher for the command, not just the first one it finds — otherwise
       # it heals the foreign hook's group by adding a second copy alongside
       # the one already installed in the other group.
       seed = %({"hooks":{"PostToolUse":[) +
              %({"matcher":"Edit|Write","hooks":[{"type":"command","command":"bash myscript.sh","timeout":30}]},) +
-             %({"matcher":"Edit|Write","hooks":[{"type":"command","command":"apropos hook post","timeout":10}]}) +
+             %({"matcher":"Edit|Write","hooks":[{"type":"command","command":"agent-apropos hook post","timeout":10}]}) +
              %(]}})
       fs = InMemoryFS.new({SETTINGS_PATH => seed})
       run_init(fs)
       merged = fs.files[SETTINGS_PATH]
       merged.should contain("bash myscript.sh")
-      merged.scan("apropos hook post").size.should eq(1)
+      merged.scan("agent-apropos hook post").size.should eq(1)
     end
 
     it "replaces a non-array event value and a group with no hooks list" do
