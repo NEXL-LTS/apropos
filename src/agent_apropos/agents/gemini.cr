@@ -163,11 +163,11 @@ module AgentApropos
       private def with_missing_hooks(group : JSON::Any) : JSON::Any
         hash = group.as_h.dup
         present = hash["hooks"]?.try(&.as_a?) || [] of JSON::Any
-        refreshed = present.map do |hook|
-          command = hook.as_h?.try(&.["command"]?).try(&.as_s?)
-          command && HOOK_COMMANDS.includes?(command) ? hook(command) : hook
+        refreshed = present.map do |entry|
+          command = entry.as_h?.try(&.["command"]?).try(&.as_s?)
+          command && HOOK_COMMANDS.includes?(command) ? hook(command) : entry
         end
-        commands = present.compact_map { |hook| hook.as_h?.try(&.["command"]?).try(&.as_s?) }
+        commands = present.compact_map { |entry| entry.as_h?.try(&.["command"]?).try(&.as_s?) }
         missing = HOOK_COMMANDS.reject { |command| commands.includes?(command) }
         hash["hooks"] = JSON::Any.new(refreshed + missing.map { |command| hook(command) })
         JSON::Any.new(hash)
@@ -196,10 +196,10 @@ module AgentApropos
       private def with_missing_read_hook(group : JSON::Any) : JSON::Any
         hash = group.as_h.dup
         present = hash["hooks"]?.try(&.as_a?) || [] of JSON::Any
-        refreshed = present.map do |hook|
-          hook.as_h?.try(&.["command"]?).try(&.as_s?) == "agent-apropos hook pre" ? hook("agent-apropos hook pre") : hook
+        refreshed = present.map do |entry|
+          entry.as_h?.try(&.["command"]?).try(&.as_s?) == "agent-apropos hook pre" ? hook("agent-apropos hook pre") : entry
         end
-        has_pre = refreshed.any? { |hook| hook.as_h?.try(&.["command"]?).try(&.as_s?) == "agent-apropos hook pre" }
+        has_pre = refreshed.any? { |entry| entry.as_h?.try(&.["command"]?).try(&.as_s?) == "agent-apropos hook pre" }
         hash["hooks"] = JSON::Any.new(has_pre ? refreshed : refreshed + [hook("agent-apropos hook pre")])
         JSON::Any.new(hash)
       end

@@ -19,11 +19,9 @@ module AgentApropos
     PROBE_RELATIVE = Path[".cache", "agent-apropos", ".doctor-probe"]
 
     def run(repo_root : Path, fs : Filesystem, env : Environment, stdout : IO, stderr : IO) : Int32
-      checks = [
-        agent_apropos_check(env),
-        index_check(repo_root, fs),
-        cache_check(repo_root, fs),
-      ] + Agents::ALL.flat_map(&.checks(repo_root, fs, env))
+      checks = [agent_apropos_check(env)] +
+               Agents::ALL.flat_map(&.checks(repo_root, fs, env)) +
+               [index_check(repo_root, fs), cache_check(repo_root, fs)]
       report(checks, stdout)
     end
 
