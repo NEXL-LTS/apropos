@@ -1,0 +1,7 @@
+{
+  "sessionId": "abc123",
+  "timestamp": 1784811091754,
+  "cwd": "/repo",
+  "toolName": "edit",
+  "toolArgs": "{\"path\":\"/repo/app/jobs/mailer_job.cr\",\"old_str\":\"old body\",\"new_str\":\"new\"}"
+}

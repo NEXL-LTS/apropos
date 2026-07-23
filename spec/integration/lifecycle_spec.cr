@@ -78,15 +78,13 @@ describe "agent-apropos init/lint/doctor/help (binary)" do
       code, stdout = run_agent_apropos(binary, ["init", "--tool", "copilot", "--repo-root", dir])
       code.should eq(0)
       stdout.should contain(".github/hooks/agent-apropos.json")
-      stdout.should contain(".github/hooks/agent-apropos-bridge.cjs")
       File.exists?(File.join(dir, ".github/hooks/agent-apropos.json")).should be_true
-      File.exists?(File.join(dir, ".github/hooks/agent-apropos-bridge.cjs")).should be_true
       File.exists?(File.join(dir, ".claude/settings.json")).should be_false
 
       hooks = File.read(File.join(dir, ".github/hooks/agent-apropos.json"))
       hooks.should contain("postToolUse")
-      hooks.should contain("agent-apropos-bridge.cjs pre")
-      hooks.should contain("agent-apropos-bridge.cjs post")
+      hooks.should contain(%("command": "agent-apropos hook pre"))
+      hooks.should contain(%("command": "agent-apropos hook post"))
 
       # `copilot` is genuinely on PATH in this devcontainer (npm-installed), so
       # doctor's advisory check actually runs rather than skipping — confirming

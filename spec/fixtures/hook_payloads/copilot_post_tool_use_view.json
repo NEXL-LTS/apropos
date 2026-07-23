@@ -1,0 +1,7 @@
+{
+  "sessionId": "abc123",
+  "timestamp": 1784811089546,
+  "cwd": "/repo",
+  "toolName": "view",
+  "toolArgs": "{\"path\":\"/repo/app/jobs/mailer_job.cr\"}"
+}

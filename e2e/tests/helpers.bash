@@ -143,7 +143,7 @@ new_sample() {
     rm -f "$WORK/.opencode/plugins/agent-apropos.js"
     printf '{"hooks":{}}\n' > "$WORK/.gemini/settings.json"
     rm -rf "$WORK/.gemini/skills"
-    rm -f "$WORK/.github/hooks/agent-apropos.json" "$WORK/.github/hooks/agent-apropos-bridge.cjs"
+    rm -f "$WORK/.github/hooks/agent-apropos.json"
     # Also remove the supporting module each rule points to (the decorator,
     # exception, registry, and audit wrapper). Each is a realistic project
     # convention rather than an arbitrary token, so it's a real, discoverable
@@ -377,10 +377,11 @@ require_live_copilot() {
 }
 
 # Run copilot non-interactively in $WORK. .github/hooks/agent-apropos.json's
-# postToolUse hooks bridge the calls (via agent-apropos-bridge.cjs) into
-# `agent-apropos hook pre`/`agent-apropos hook post`; agent-apropos and node must both
-# be on PATH. Stdout is written to $WORK/_cp_out.txt; a nonzero exit skips the
-# test, same convention as run_opencode/run_gemini.
+# postToolUse hooks call `agent-apropos hook pre`/`agent-apropos hook post`
+# directly — no bridge script, since the binary understands Copilot's own
+# wire dialect natively; agent-apropos must be on PATH. Stdout is written to
+# $WORK/_cp_out.txt; a nonzero exit skips the test, same convention as
+# run_opencode/run_gemini.
 run_copilot() {  # arg: prompt
   local model_args=()
   [ -n "${E2E_MODEL:-}" ] && model_args=(--model "$E2E_MODEL")

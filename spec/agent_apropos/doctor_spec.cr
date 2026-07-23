@@ -226,35 +226,22 @@ describe AgentApropos::Doctor do
       stdout.should contain("copilot: not on PATH; skipped hook check")
     end
 
-    it "warns when copilot is on PATH but the bridge script is absent" do
+    it "warns when copilot is on PATH but agent-apropos.json is absent" do
       env = FakeEnv.new(present: {"copilot" => "/usr/bin/copilot"})
       _, stdout = run_doctor(InMemoryFS.new, env)
-      stdout.should contain("warn  copilot: hook bridge absent; run `agent-apropos init --tool copilot`")
-    end
-
-    it "warns when the bridge script is present but agent-apropos.json is absent" do
-      env = FakeEnv.new(present: {"copilot" => "/usr/bin/copilot"})
-      fs = InMemoryFS.new({"/repo/.github/hooks/agent-apropos-bridge.cjs" => "// bridge"})
-      _, stdout = run_doctor(fs, env)
-      stdout.should contain("warn  copilot: .github/hooks/agent-apropos.json absent")
+      stdout.should contain("warn  copilot: .github/hooks/agent-apropos.json absent; run `agent-apropos init --tool copilot`")
     end
 
     it "warns when agent-apropos.json is not valid JSON" do
       env = FakeEnv.new(present: {"copilot" => "/usr/bin/copilot"})
-      fs = InMemoryFS.new({
-        "/repo/.github/hooks/agent-apropos-bridge.cjs" => "// bridge",
-        "/repo/.github/hooks/agent-apropos.json"       => "{not json",
-      })
+      fs = InMemoryFS.new({"/repo/.github/hooks/agent-apropos.json" => "{not json"})
       _, stdout = run_doctor(fs, env)
       stdout.should contain("copilot: .github/hooks/agent-apropos.json is not valid JSON")
     end
 
     it "warns when the postToolUse hook is absent" do
       env = FakeEnv.new(present: {"copilot" => "/usr/bin/copilot"})
-      fs = InMemoryFS.new({
-        "/repo/.github/hooks/agent-apropos-bridge.cjs" => "// bridge",
-        "/repo/.github/hooks/agent-apropos.json"       => %({"version":1,"hooks":{}}),
-      })
+      fs = InMemoryFS.new({"/repo/.github/hooks/agent-apropos.json" => %({"version":1,"hooks":{}})})
       _, stdout = run_doctor(fs, env)
       stdout.should contain("warn  copilot: postToolUse hook absent")
     end
@@ -262,12 +249,9 @@ describe AgentApropos::Doctor do
     it "warns when only one of pre/post is wired for the create|edit matcher" do
       env = FakeEnv.new(present: {"copilot" => "/usr/bin/copilot"})
       only_pre = %({"hooks":{"postToolUse":[) +
-                 %({"matcher":"create|edit","command":"node bridge.cjs pre"}) +
+                 %({"matcher":"create|edit","command":"agent-apropos hook pre"}) +
                  %(]}})
-      fs = InMemoryFS.new({
-        "/repo/.github/hooks/agent-apropos-bridge.cjs" => "// bridge",
-        "/repo/.github/hooks/agent-apropos.json"       => only_pre,
-      })
+      fs = InMemoryFS.new({"/repo/.github/hooks/agent-apropos.json" => only_pre})
       _, stdout = run_doctor(fs, env)
       stdout.should contain("warn  copilot: postToolUse hook absent")
     end
@@ -275,14 +259,11 @@ describe AgentApropos::Doctor do
     it "is ok when copilot is on PATH and both hooks are wired" do
       env = FakeEnv.new(present: {"copilot" => "/usr/bin/copilot"})
       wired = %({"hooks":{"postToolUse":[) +
-              %({"matcher":"view","command":"node bridge.cjs pre"},) +
-              %({"matcher":"create|edit","command":"node bridge.cjs pre"},) +
-              %({"matcher":"create|edit","command":"node bridge.cjs post"}) +
+              %({"matcher":"view","command":"agent-apropos hook pre"},) +
+              %({"matcher":"create|edit","command":"agent-apropos hook pre"},) +
+              %({"matcher":"create|edit","command":"agent-apropos hook post"}) +
               %(]}})
-      fs = InMemoryFS.new({
-        "/repo/.github/hooks/agent-apropos-bridge.cjs" => "// bridge",
-        "/repo/.github/hooks/agent-apropos.json"       => wired,
-      })
+      fs = InMemoryFS.new({"/repo/.github/hooks/agent-apropos.json" => wired})
       _, stdout = run_doctor(fs, env)
       stdout.should contain("ok    copilot: postToolUse hook wired")
     end
@@ -290,13 +271,10 @@ describe AgentApropos::Doctor do
     it "warns when pre and post are both present but only in the view matcher, not create|edit" do
       env = FakeEnv.new(present: {"copilot" => "/usr/bin/copilot"})
       split = %({"hooks":{"postToolUse":[) +
-              %({"matcher":"view","command":"node bridge.cjs pre"},) +
-              %({"matcher":"view","command":"node bridge.cjs post"}) +
+              %({"matcher":"view","command":"agent-apropos hook pre"},) +
+              %({"matcher":"view","command":"agent-apropos hook post"}) +
               %(]}})
-      fs = InMemoryFS.new({
-        "/repo/.github/hooks/agent-apropos-bridge.cjs" => "// bridge",
-        "/repo/.github/hooks/agent-apropos.json"       => split,
-      })
+      fs = InMemoryFS.new({"/repo/.github/hooks/agent-apropos.json" => split})
       _, stdout = run_doctor(fs, env)
       stdout.should contain("warn  copilot: postToolUse hook absent")
     end

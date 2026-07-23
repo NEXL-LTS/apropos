@@ -19,7 +19,6 @@ module AgentApropos
     OPENCODE_PLUGIN_RELATIVE = Path[".opencode", "plugins", "agent-apropos.js"]
     GEMINI_SETTINGS_RELATIVE = Path[".gemini", "settings.json"]
     COPILOT_HOOKS_RELATIVE   = Path[".github", "hooks", "agent-apropos.json"]
-    COPILOT_BRIDGE_RELATIVE  = Path[".github", "hooks", "agent-apropos-bridge.cjs"]
     PROBE_RELATIVE           = Path[".cache", "agent-apropos", ".doctor-probe"]
 
     AGENT_APROPOS_HOOK_PREFIX = "agent-apropos hook"
@@ -190,18 +189,16 @@ module AgentApropos
       end
     end
 
-    # Check for the Copilot CLI binary, the generated bridge script, and that
-    # the `create|edit`-matched `postToolUse` group calls both
-    # `agent-apropos-bridge.cjs pre` and `... post` (Copilot's `preToolUse` output
-    # schema has no context field, so — like Gemini — both Layer 2 and Layer 3
-    # are wired onto `postToolUse` instead; see `Init#scaffold_copilot`).
-    # Advisory only: never fails, so a Copilot-less repo is not penalised.
+    # Check for the Copilot CLI binary and that the `create|edit`-matched
+    # `postToolUse` group calls both `agent-apropos hook pre` and `... post`
+    # directly (Copilot's `preToolUse` output schema has no context field, so
+    # — like Gemini — both Layer 2 and Layer 3 are wired onto `postToolUse`
+    # instead; see `Init#scaffold_copilot`). No bridge script to check for:
+    # `Payload`/`Hook.emit` understand Copilot's dialect natively. Advisory
+    # only: never fails, so a Copilot-less repo is not penalised.
     private def copilot_check(repo_root : Path, fs : Filesystem, env : Environment) : Check
       unless env.which("copilot")
         return Check.new(:ok, "copilot", "not on PATH; skipped hook check")
-      end
-      unless fs.exists?(repo_root.join(COPILOT_BRIDGE_RELATIVE).to_s)
-        return Check.new(:warn, "copilot", "hook bridge absent; run `agent-apropos init --tool copilot`")
       end
 
       content = fs.read?(repo_root.join(COPILOT_HOOKS_RELATIVE).to_s)
@@ -217,8 +214,8 @@ module AgentApropos
       end
     end
 
-    # Whether the `create|edit`-matched `postToolUse` entries include both a
-    # `... pre` and a `... post` bridge invocation. Checked scoped to that one
+    # Whether the `create|edit`-matched `postToolUse` entries include both
+    # `agent-apropos hook pre` and `... post`. Checked scoped to that one
     # matcher, not flattened across every `postToolUse` entry: the `view`-matched
     # entry carries only `pre` (Layer 3 needs written content a mere read never
     # has), so a flattened check could see both commands present overall while
@@ -238,7 +235,7 @@ module AgentApropos
         .select { |entry| entry["matcher"]?.try(&.as_s?) == "create|edit" }
         .compact_map { |entry| entry["command"]?.try(&.as_s?) }
 
-      commands.any?(&.ends_with?(" pre")) && commands.any?(&.ends_with?(" post"))
+      commands.includes?("agent-apropos hook pre") && commands.includes?("agent-apropos hook post")
     end
 
     private def index_check(repo_root : Path, fs : Filesystem) : Check

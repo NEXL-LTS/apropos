@@ -8,7 +8,6 @@ private GITIGNORE            = "/repo/.gitignore"
 private PLUGIN_PATH          = "/repo/.opencode/plugins/agent-apropos.js"
 private GEMINI_SETTINGS_PATH = "/repo/.gemini/settings.json"
 private COPILOT_HOOKS_PATH   = "/repo/.github/hooks/agent-apropos.json"
-private COPILOT_BRIDGE_PATH  = "/repo/.github/hooks/agent-apropos-bridge.cjs"
 
 # A configurable Environment double: `present` is the set of CLI agent
 # binaries that resolve on PATH, used to exercise auto-detection.
@@ -535,7 +534,7 @@ describe AgentApropos::Init do
   end
 
   describe "copilot hooks scaffold" do
-    it "writes the postToolUse hook config and the bridge script" do
+    it "writes the postToolUse hook config calling agent-apropos hook pre/post directly (no bridge)" do
       fs = InMemoryFS.new
       code, stdout, stderr = run_init(fs, AgentApropos::Init::Options.new(tools: Set{"copilot"}))
       code.should eq(0)
@@ -545,16 +544,10 @@ describe AgentApropos::Init do
       hooks.should contain(%("postToolUse"))
       hooks.should contain(%("matcher": "view"))
       hooks.should contain(%("matcher": "create|edit"))
-      hooks.should contain("agent-apropos-bridge.cjs pre")
-      hooks.should contain("agent-apropos-bridge.cjs post")
-
-      bridge = fs.files[COPILOT_BRIDGE_PATH]
-      bridge.should contain(%(["hook", sub]))
-      bridge.should contain("toolArgs")
-      bridge.should contain("file_path")
-      bridge.should contain("additionalContext")
+      hooks.should contain(%("command": "agent-apropos hook pre"))
+      hooks.should contain(%("command": "agent-apropos hook post"))
+      hooks.should_not contain("bridge")
       stdout.should contain(".github/hooks/agent-apropos.json")
-      stdout.should contain(".github/hooks/agent-apropos-bridge.cjs")
     end
 
     it "does not wire preToolUse — Copilot's preToolUse output schema cannot inject context" do
@@ -563,26 +556,21 @@ describe AgentApropos::Init do
       fs.files[COPILOT_HOOKS_PATH].should_not contain("preToolUse")
     end
 
-    it "is idempotent — re-running reports current and does not rewrite either file" do
+    it "is idempotent — re-running reports current and does not rewrite the file" do
       fs = InMemoryFS.new
       run_init(fs, AgentApropos::Init::Options.new(tools: Set{"copilot"}))
       hooks_before = fs.files[COPILOT_HOOKS_PATH]
-      bridge_before = fs.files[COPILOT_BRIDGE_PATH]
 
       _, stdout, _ = run_init(fs, AgentApropos::Init::Options.new(tools: Set{"copilot"}))
       stdout.should contain("current  .github/hooks/agent-apropos.json")
-      stdout.should contain("current  .github/hooks/agent-apropos-bridge.cjs")
       fs.files[COPILOT_HOOKS_PATH].should eq(hooks_before)
-      fs.files[COPILOT_BRIDGE_PATH].should eq(bridge_before)
     end
 
     it "reports would-create under --dry-run without writing" do
       fs = InMemoryFS.new
       _, stdout, _ = run_init(fs, AgentApropos::Init::Options.new(tools: Set{"copilot"}, dry_run: true))
       stdout.should contain("would create .github/hooks/agent-apropos.json")
-      stdout.should contain("would create .github/hooks/agent-apropos-bridge.cjs")
       fs.files.has_key?(COPILOT_HOOKS_PATH).should be_false
-      fs.files.has_key?(COPILOT_BRIDGE_PATH).should be_false
     end
 
     it "auto-detects copilot on PATH" do

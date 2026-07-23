@@ -27,10 +27,12 @@ macOS binary.
   `context.fileName`, and generated `.gemini/skills/*/SKILL.md` wrappers.
 - **GitHub Copilot CLI** — both Layer 2 and Layer 3 delivered via its `postToolUse` hook (its
   `preToolUse` event can only allow/deny/modify a call, not inject context, so — like Gemini — Layer 2
-  lands right after the edit rather than before it), via a generated `.github/hooks/agent-apropos.json` +
-  bridge script, and `AGENTS.md` read automatically. Repo-level hooks require a trusted folder, and
-  non-interactive `copilot -p` runs need `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true` set for hooks to
-  fire at all.
+  lands right after the edit rather than before it), calling `agent-apropos hook pre`/`post` directly —
+  no bridge script — since the binary understands Copilot's own wire dialect (`toolArgs` as a
+  JSON-encoded string) and replies in its flat `additionalContext` shape natively. Wired via a
+  generated `.github/hooks/agent-apropos.json`; `AGENTS.md` is read automatically. Repo-level hooks
+  require a trusted folder, and non-interactive `copilot -p` runs need
+  `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true` set for hooks to fire at all.
 - **Codex** and **Cursor CLI** — coming soon.
 
 ## Install

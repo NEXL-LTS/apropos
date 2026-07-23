@@ -103,7 +103,7 @@ module AgentApropos
       fresh.each { |entry| state.add(entry.path) }
       state.notify! if notice
       state.save(root, fs, payload.session_id, now)
-      emit(stdout, event_name(event), combined)
+      emit(stdout, event_name(event), combined, payload.copilot?)
     end
 
     # The one-time notice, or nil once already delivered this session. A nil
@@ -195,13 +195,25 @@ module AgentApropos
       Rendering.context(docs)
     end
 
-    private def emit(stdout : IO, event_name : String, context : String) : Nil
+    # GitHub Copilot CLI's `postToolUse` output schema has no envelope — just
+    # a flat `additionalContext` key — unlike every other wired agent (Claude
+    # Code's own convention, which Gemini's `AfterTool` and OpenCode's plugin
+    # bridge both also expect), which want it nested under
+    # `hookSpecificOutput.hookEventName`/`additionalContext`. `copilot`
+    # (`Payload#copilot?`, detected from the *input's* own wire shape) picks
+    # the reply shape — never the reverse, so an already-wired agent's output
+    # never changes.
+    private def emit(stdout : IO, event_name : String, context : String, copilot : Bool) : Nil
       JSON.build(stdout) do |json|
         json.object do
-          json.field "hookSpecificOutput" do
-            json.object do
-              json.field "hookEventName", event_name
-              json.field "additionalContext", context
+          if copilot
+            json.field "additionalContext", context
+          else
+            json.field "hookSpecificOutput" do
+              json.object do
+                json.field "hookEventName", event_name
+                json.field "additionalContext", context
+              end
             end
           end
         end

@@ -359,4 +359,43 @@ describe AgentApropos::Hook do
       stdout.should contain("Convention (docs/conventions/db.md):")
     end
   end
+
+  # GitHub Copilot CLI calls `agent-apropos hook pre`/`post` directly (see
+  # init.cr's scaffold_copilot) — no bridge script — because Payload
+  # understands its dialect (camelCase, toolArgs as a JSON-encoded string)
+  # natively. Its postToolUse hook output schema has no envelope, though —
+  # just a flat additionalContext key — unlike every other wired agent, so
+  # these cases lock in that the reply shape differs only for a
+  # Copilot-shaped payload, never for Claude/Gemini/OpenCode's.
+  describe "Copilot CLI payload shape (flat additionalContext, no envelope)" do
+    it "matches a Layer 2 rule from a view toolArgs payload and emits flat additionalContext" do
+      fs = InMemoryFS.new({A_PATH => A_DOC})
+      input = %({"sessionId":"s","toolName":"view","cwd":"/repo",) +
+              %("toolArgs":"{\\"path\\":\\"/repo/src/app.cr\\"}"})
+      code, stdout = invoke(:pre, input, fs)
+      code.should eq(0)
+      stdout.should contain("Convention (docs/conventions/a.md):")
+      stdout.should_not contain("hookSpecificOutput")
+      JSON.parse(stdout)["additionalContext"].as_s.should contain("Convention (docs/conventions/a.md):")
+    end
+
+    it "matches a Layer 3 rule from a create toolArgs payload's file_text" do
+      fs = InMemoryFS.new({DB_PATH => DB_DOC})
+      input = %({"sessionId":"s","toolName":"create","cwd":"/repo",) +
+              %("toolArgs":"{\\"path\\":\\"/repo/lib/x.cr\\",\\"file_text\\":\\"db.transaction do\\"}"})
+      code, stdout = invoke(:post, input, fs)
+      code.should eq(0)
+      stdout.should contain("Convention (docs/conventions/db.md):")
+      stdout.should_not contain("hookSpecificOutput")
+    end
+
+    it "still emits the hookSpecificOutput envelope for a non-Copilot payload (no regression)" do
+      fs = InMemoryFS.new({A_PATH => A_DOC})
+      code, stdout = invoke(:pre, pre_json("/repo/src/app.cr"), fs)
+      code.should eq(0)
+      stdout.should contain(%("hookSpecificOutput"))
+      JSON.parse(stdout)["hookSpecificOutput"]["additionalContext"].as_s
+        .should contain("Convention (docs/conventions/a.md):")
+    end
+  end
 end

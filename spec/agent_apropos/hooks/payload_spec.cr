@@ -54,4 +54,58 @@ describe AgentApropos::Hook::Payload do
       parse(json).written_contents.should eq(["x", "y"])
     end
   end
+
+  # GitHub Copilot CLI's own wire format, confirmed against a real captured
+  # hook payload (upstream docs type toolArgs as `unknown`): camelCase
+  # top-level fields, and toolArgs arrives as a JSON-encoded STRING (not a
+  # nested object), keyed by path/file_text/old_str/new_str rather than
+  # file_path/content/new_string. `Payload` understands this dialect
+  # natively so Copilot's hook config can call `agent-apropos hook pre`/`post`
+  # directly, with no bridge script translating one shape into the other.
+  describe "Copilot CLI payload shape" do
+    it "reads sessionId (camelCase) as session_id" do
+      json = %({"sessionId":"abc123","toolName":"view","cwd":"/repo",) +
+             %("toolArgs":"{\\"path\\":\\"/repo/a.cr\\"}"})
+      parse(json).session_id.should eq("abc123")
+    end
+
+    it "reads path out of toolArgs's JSON-encoded string as file_path" do
+      json = %({"toolName":"view","toolArgs":"{\\"path\\":\\"/repo/a.cr\\"}"})
+      parse(json).file_path.should eq("/repo/a.cr")
+    end
+
+    it "reads a create tool's file_text as written content" do
+      json = %({"toolName":"create",) +
+             %("toolArgs":"{\\"path\\":\\"/repo/a.cr\\",\\"file_text\\":\\"hello\\"}"})
+      parse(json).written_contents.should eq(["hello"])
+    end
+
+    it "reads an edit tool's new_str as written content" do
+      json = %({"toolName":"edit",) +
+             %("toolArgs":"{\\"path\\":\\"/repo/a.cr\\",\\"old_str\\":\\"a\\",\\"new_str\\":\\"b\\"}"})
+      parse(json).written_contents.should eq(["b"])
+    end
+
+    it "reports #copilot? true only when toolArgs is present" do
+      copilot = %({"toolName":"view","toolArgs":"{\\"path\\":\\"/repo/a.cr\\"}"})
+      parse(copilot).copilot?.should be_true
+
+      claude = %({"tool_input":{"file_path":"a.cr"}})
+      parse(claude).copilot?.should be_false
+    end
+
+    it "tolerates a malformed toolArgs string (fail open)" do
+      json = %({"toolName":"view","toolArgs":"{not json"})
+      payload = parse(json)
+      payload.file_path.should be_nil
+      payload.written_contents.should be_empty
+      # toolArgs was present but unparseable — still Copilot-shaped for
+      # emit's purposes, not silently misidentified as some other agent.
+      payload.copilot?.should be_true
+    end
+
+    it "tolerates a payload with no toolArgs at all when checked for Copilot shape" do
+      parse(%({"tool_name":"Edit"})).copilot?.should be_false
+    end
+  end
 end
