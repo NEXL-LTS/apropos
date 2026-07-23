@@ -16,18 +16,16 @@
 # Adding a CLI agent means adding one entry here plus its require_live_<x>/
 # run_<x> pair below — no per-layer test to write.
 #
-# KNOWN GAP: agent-apropos has no Layer 4 (skill) delivery for Copilot CLI yet — only
-# Layers 2/3 (postToolUse hooks). Since register_live_tests runs every agent
-# through every registered layer uniformly, the "Layer 4 ... (Copilot)" pair
-# still gets registered and its "with" case still passes — but that pass is a
-# false positive, not proof of anything agent-apropos did: confirmed by disabling
-# .github/hooks entirely and re-running the Layer 4 prompt, which still
-# produced the expected artifact purely from Copilot exploring lib/ on its
-# own (the target module is deliberately left in the "with" tree — see
-# new_sample() below — reachable by exploration independent of any hook,
-# exactly the risk this file's own comment on that removal already names).
-# Treat "Layer 4 ... (Copilot)" results as uninformative until real Copilot
-# skill delivery exists.
+# Layer 4 (skills) works for Copilot CLI with no agent-apropos-side work at all:
+# `copilot skill --help` documents that it discovers project skills from
+# .github/skills/, .agents/skills/, OR .claude/skills/ natively — the same
+# path agent-apropos generate already writes for Claude Code/OpenCode. Verified
+# by isolating the two possible causes: with .claude/skills/add-operation/
+# SKILL.md present but lib/registry.py (the target module) removed, Copilot
+# still referenced the skill's register_operation() guidance verbatim in its
+# response; with the skill file removed but lib/registry.py left in place, it
+# used neither — proving the skill file, not tree exploration, is what
+# Copilot actually reads.
 E2E_AGENTS=(
   "Claude|require_live_claude|run_claude"
   "OpenCode|require_live_opencode|run_opencode"

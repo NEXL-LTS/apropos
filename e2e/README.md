@@ -129,13 +129,16 @@ invoke `copilot` yourself outside the suite to debug.
 
 **Copilot CLI caveat:** its own `preToolUse` event can't inject context (only
 `postToolUse` can), so its Layer 2 lands right after the edit rather than
-before it — see the root README's Supported CLI agents section. More
-importantly, **Layer 4 is not implemented for Copilot** (agent-apropos has no
-skill-delivery mechanism for it yet): the "Layer 4 ... (Copilot)" pair still
-runs, but its "with" pass is a false positive, confirmed by disabling
-`.github/hooks` entirely and observing Copilot still produce the expected
-artifact purely by exploring the sample's tree on its own. Don't treat that
-one pair as evidence of anything until real Copilot skill delivery exists.
+before it — see the root README's Supported CLI agents section. Layer 4
+(skills), by contrast, needs no Copilot-specific work at all: `copilot skill
+--help` documents that it discovers project skills from `.github/skills/`,
+`.agents/skills/`, or `.claude/skills/` natively, and `agent-apropos generate`
+already writes the latter for Claude Code/OpenCode — Copilot just picks it
+up. Verified by isolating the two possible causes: with the skill file
+present but the target module removed, Copilot cited the skill's guidance
+verbatim; with the skill file removed but the module left in place, it used
+neither. So the "Layer 4 ... (Copilot)" pair is a genuine proof, same as
+every other agent's.
 
 ## Options
 
