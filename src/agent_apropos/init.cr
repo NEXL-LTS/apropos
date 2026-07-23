@@ -69,10 +69,10 @@ module AgentApropos
       tools = resolve_tools(env, options.tools)
       report_tools(stdout, options.tools, tools)
       scaffold(repo_root, fs, options, stdout)
+      Agents::ALL.each { |agent| agent.scaffold(repo_root, fs, options, stdout) if tools.includes?(agent.name) }
       merge_gitignore(repo_root, fs, options, stdout)
       write_examples(repo_root, fs, options, stdout) if options.example
       link_claude(repo_root, fs, options, stdout) if options.claude_symlink
-      Agents::ALL.each { |agent| agent.scaffold(repo_root, fs, options, stdout) if tools.includes?(agent.name) }
       stdout.puts NEXT_STEPS_HINT unless options.dry_run
       0
     rescue ex : AgentApropos::Error
