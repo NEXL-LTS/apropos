@@ -40,7 +40,7 @@ describe AgentApropos::Matcher do
       AgentApropos::Matcher.content_match?("\\btransaction\\b", "plain text").should be_false
     end
 
-    it "raises a apropos error on an invalid regex source" do
+    it "raises an AgentApropos error on an invalid regex source" do
       expect_raises(AgentApropos::Matcher::Error, /invalid regex/) do
         AgentApropos::Matcher.content_match?("(", "anything")
       end
