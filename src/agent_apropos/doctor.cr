@@ -18,6 +18,7 @@ module AgentApropos
     SETTINGS_RELATIVE        = Path[".claude", "settings.json"]
     OPENCODE_PLUGIN_RELATIVE = Path[".opencode", "plugins", "agent-apropos.js"]
     GEMINI_SETTINGS_RELATIVE = Path[".gemini", "settings.json"]
+    COPILOT_HOOKS_RELATIVE   = Path[".github", "hooks", "agent-apropos.json"]
     PROBE_RELATIVE           = Path[".cache", "agent-apropos", ".doctor-probe"]
 
     AGENT_APROPOS_HOOK_PREFIX = "agent-apropos hook"
@@ -36,6 +37,7 @@ module AgentApropos
         claude_check(env),
         opencode_check(repo_root, fs, env),
         gemini_check(repo_root, fs, env),
+        copilot_check(repo_root, fs, env),
         index_check(repo_root, fs),
         cache_check(repo_root, fs),
       ]
@@ -185,6 +187,55 @@ module AgentApropos
           .compact_map { |hook| hook.as_h?.try(&.["command"]?).try(&.as_s?) }
         commands.includes?("agent-apropos hook pre") && commands.includes?("agent-apropos hook post")
       end
+    end
+
+    # Check for the Copilot CLI binary and that the `create|edit`-matched
+    # `postToolUse` group calls both `agent-apropos hook pre` and `... post`
+    # directly (Copilot's `preToolUse` output schema has no context field, so
+    # — like Gemini — both Layer 2 and Layer 3 are wired onto `postToolUse`
+    # instead; see `Init#scaffold_copilot`). No bridge script to check for:
+    # `Payload`/`Hook.emit` understand Copilot's dialect natively. Advisory
+    # only: never fails, so a Copilot-less repo is not penalised.
+    private def copilot_check(repo_root : Path, fs : Filesystem, env : Environment) : Check
+      unless env.which("copilot")
+        return Check.new(:ok, "copilot", "not on PATH; skipped hook check")
+      end
+
+      content = fs.read?(repo_root.join(COPILOT_HOOKS_RELATIVE).to_s)
+      return Check.new(:warn, "copilot", ".github/hooks/agent-apropos.json absent; run `agent-apropos init --tool copilot`") unless content
+
+      wired = copilot_wired?(content)
+      return Check.new(:warn, "copilot", ".github/hooks/agent-apropos.json is not valid JSON") if wired.nil?
+
+      if wired
+        Check.new(:ok, "copilot", "postToolUse hook wired")
+      else
+        Check.new(:warn, "copilot", "postToolUse hook absent; run `agent-apropos init --tool copilot`")
+      end
+    end
+
+    # Whether the `create|edit`-matched `postToolUse` entries include both
+    # `agent-apropos hook pre` and `... post`. Checked scoped to that one
+    # matcher, not flattened across every `postToolUse` entry: the `view`-matched
+    # entry carries only `pre` (Layer 3 needs written content a mere read never
+    # has), so a flattened check could see both commands present overall while
+    # the write-side entries themselves are missing one. Returns nil when the
+    # hooks file is not parseable JSON.
+    private def copilot_wired?(content : String) : Bool?
+      parsed =
+        begin
+          JSON.parse(content)
+        rescue JSON::ParseException
+          return nil
+        end
+      entries = parsed.as_h?.try(&.["hooks"]?).try(&.as_h?).try(&.["postToolUse"]?).try(&.as_a?)
+      return false unless entries
+
+      commands = entries.compact_map(&.as_h?)
+        .select { |entry| entry["matcher"]?.try(&.as_s?) == "create|edit" }
+        .compact_map { |entry| entry["command"]?.try(&.as_s?) }
+
+      commands.includes?("agent-apropos hook pre") && commands.includes?("agent-apropos hook post")
     end
 
     private def index_check(repo_root : Path, fs : Filesystem) : Check

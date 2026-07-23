@@ -8,4 +8,5 @@ __pycache__/
 /.claude/
 /.opencode/
 /.gemini/
+/.github/hooks/
 /CLAUDE.md

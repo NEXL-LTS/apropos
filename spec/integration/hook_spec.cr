@@ -116,4 +116,65 @@ describe "agent-apropos hook (binary)" do
       FileUtils.rm_rf(dir)
     end
   end
+
+  # GitHub Copilot CLI calls `agent-apropos hook pre`/`post` directly — no
+  # bridge script — since Payload understands its dialect (camelCase,
+  # toolArgs as a JSON-encoded string) natively (see init.cr's
+  # scaffold_copilot). These fixtures are real captures of that shape (see
+  # spec/fixtures/hook_payloads/), proving the binary needs no bridge, not
+  # just the injected-IO unit specs.
+  it "handles a Copilot CLI create postToolUse payload with no bridge script" do
+    dir = File.tempname("agent-apropos-hook-repo")
+    begin
+      Dir.mkdir_p(File.join(dir, "docs/conventions"))
+      File.write(File.join(dir, "docs/conventions/db.md"),
+        "---\ncontents: ['\\btransaction\\b']\n---\n# DB\n\nWrap writes in a transaction.\n")
+
+      payload = File.read("spec/fixtures/hook_payloads/copilot_post_tool_use_create.json")
+        .gsub("/repo", dir)
+
+      code, output = run_hook(binary, ["hook", "post", "--repo-root", dir], payload)
+      code.should eq(0)
+      output.should contain("Wrap writes in a transaction.")
+      output.should_not contain("hookSpecificOutput")
+    ensure
+      FileUtils.rm_rf(dir)
+    end
+  end
+
+  it "handles a Copilot CLI edit postToolUse payload with no bridge script" do
+    dir = File.tempname("agent-apropos-hook-repo")
+    begin
+      Dir.mkdir_p(File.join(dir, "docs/conventions"))
+      File.write(File.join(dir, "docs/conventions/jobs.md"),
+        "---\npaths: [\"app/jobs/**\"]\n---\n# Jobs\n\nKeep jobs idempotent.\n")
+
+      payload = File.read("spec/fixtures/hook_payloads/copilot_post_tool_use_edit.json")
+        .gsub("/repo", dir)
+
+      code, output = run_hook(binary, ["hook", "pre", "--repo-root", dir], payload)
+      code.should eq(0)
+      output.should contain("Keep jobs idempotent.")
+    ensure
+      FileUtils.rm_rf(dir)
+    end
+  end
+
+  it "handles a Copilot CLI view postToolUse payload (Layer 2 on a plain read)" do
+    dir = File.tempname("agent-apropos-hook-repo")
+    begin
+      Dir.mkdir_p(File.join(dir, "docs/conventions"))
+      File.write(File.join(dir, "docs/conventions/jobs.md"),
+        "---\npaths: [\"app/jobs/**\"]\n---\n# Jobs\n\nKeep jobs idempotent.\n")
+
+      payload = File.read("spec/fixtures/hook_payloads/copilot_post_tool_use_view.json")
+        .gsub("/repo", dir)
+
+      code, output = run_hook(binary, ["hook", "pre", "--repo-root", dir], payload)
+      code.should eq(0)
+      output.should contain("Keep jobs idempotent.")
+    ensure
+      FileUtils.rm_rf(dir)
+    end
+  end
 end

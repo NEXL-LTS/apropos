@@ -15,9 +15,21 @@
 # Registered CLI agents for the live matrix: "name|require_live_fn|run_fn".
 # Adding a CLI agent means adding one entry here plus its require_live_<x>/
 # run_<x> pair below — no per-layer test to write.
+#
+# Layer 4 (skills) works for Copilot CLI with no agent-apropos-side work at all:
+# `copilot skill --help` documents that it discovers project skills from
+# .github/skills/, .agents/skills/, OR .claude/skills/ natively — the same
+# path agent-apropos generate already writes for Claude Code/OpenCode. Verified
+# by isolating the two possible causes: with .claude/skills/add-operation/
+# SKILL.md present but lib/registry.py (the target module) removed, Copilot
+# still referenced the skill's register_operation() guidance verbatim in its
+# response; with the skill file removed but lib/registry.py left in place, it
+# used neither — proving the skill file, not tree exploration, is what
+# Copilot actually reads.
 E2E_AGENTS=(
   "Claude|require_live_claude|run_claude"
   "OpenCode|require_live_opencode|run_opencode"
+  "Copilot|require_live_copilot|run_copilot"
 )
 
 # Gemini CLI is opt-in, not part of the default matrix: even when healthy it
@@ -129,6 +141,7 @@ new_sample() {
     rm -f "$WORK/.opencode/plugins/agent-apropos.js"
     printf '{"hooks":{}}\n' > "$WORK/.gemini/settings.json"
     rm -rf "$WORK/.gemini/skills"
+    rm -f "$WORK/.github/hooks/agent-apropos.json"
     # Also remove the supporting module each rule points to (the decorator,
     # exception, registry, and audit wrapper). Each is a realistic project
     # convention rather than an arbitrary token, so it's a real, discoverable
@@ -147,6 +160,7 @@ new_sample() {
 claude_ready() { command -v claude >/dev/null 2>&1; }
 opencode_ready() { command -v opencode >/dev/null 2>&1; }
 gemini_ready() { command -v gemini >/dev/null 2>&1; }
+copilot_ready() { command -v copilot >/dev/null 2>&1; }
 
 # Echo the exact live command a runner is about to execute, so it can be copied
 # and run by hand to reproduce a failure.
@@ -318,5 +332,65 @@ run_gemini() {  # arg: prompt
   if [ "$rc" -ne 0 ]; then
     touch "$BATS_RUN_TMPDIR/gemini_unusable"
     skip "gemini exited $rc"
+  fi
+}
+
+# --- live copilot runner --------------------------------------------------------
+#
+# Two Copilot-specific env vars every invocation below carries:
+#
+# - `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true` — Copilot CLI disables
+#   repo-level `.github/hooks/*.json` hooks by default under `-p` (prompt
+#   mode), specifically so an unfamiliar repo's hooks can't fire silently on a
+#   quick one-off command. Without this, agent-apropos's hook wiring here would
+#   just never fire and every "with" test would look identical to "without".
+# - `-u GH_TOKEN` — a stale/scope-less GH_TOKEN in the environment (common in
+#   devcontainers/CI, which often export one for other tooling) shadows the
+#   CLI's own stored credential and makes every call fail with an
+#   authentication error even when `copilot` itself is logged in.
+#
+# `--allow-all-tools` is Copilot's own documented requirement for
+# non-interactive mode — without it a headless run blocks on a confirmation
+# prompt that never arrives, same reason Gemini's runner passes
+# --approval-mode auto_edit.
+
+# Skip unless a real, authenticated copilot is available. Uses a run-wide
+# unusable flag so that once copilot is found unusable, later live tests skip
+# immediately instead of each paying for a failed call.
+require_live_copilot() {
+  copilot_ready || skip "copilot not on PATH"
+  [ -f "$BATS_RUN_TMPDIR/copilot_unusable" ] && skip "copilot unusable (detected earlier)"
+  if [ ! -f "$BATS_RUN_TMPDIR/copilot_auth_ok" ]; then
+    local rc=0
+    echo_cmd "env -u GH_TOKEN timeout 60 copilot -p \"reply with the single word READY\" --allow-all-tools --no-custom-instructions"
+    env -u GH_TOKEN timeout 60 copilot -p "reply with the single word READY" --allow-all-tools --no-custom-instructions \
+      >/dev/null 2>/dev/null || rc=$?
+    if [ "$rc" -ne 0 ]; then
+      touch "$BATS_RUN_TMPDIR/copilot_unusable"
+      skip "copilot not authenticated (exit $rc)"
+    fi
+    touch "$BATS_RUN_TMPDIR/copilot_auth_ok"
+  fi
+  return 0
+}
+
+# Run copilot non-interactively in $WORK. .github/hooks/agent-apropos.json's
+# postToolUse hooks call `agent-apropos hook pre`/`agent-apropos hook post`
+# directly — no bridge script, since the binary understands Copilot's own
+# wire dialect natively; agent-apropos must be on PATH. Stdout is written to
+# $WORK/_cp_out.txt; a nonzero exit skips the test, same convention as
+# run_opencode/run_gemini.
+run_copilot() {  # arg: prompt
+  local model_args=()
+  [ -n "${E2E_MODEL:-}" ] && model_args=(--model "$E2E_MODEL")
+  local rc=0
+  echo_cmd "cd $WORK && env -u GH_TOKEN GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true timeout -k 10 180 copilot -p \"$1\" --allow-all-tools ${model_args[*]}"
+  (
+    cd "$WORK" && env -u GH_TOKEN GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true \
+      timeout -k 10 180 copilot -p "$1" --allow-all-tools "${model_args[@]}"
+  ) >"$WORK/_cp_out.txt" 2>"$WORK/_cp_err.txt" || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    touch "$BATS_RUN_TMPDIR/copilot_unusable"
+    skip "copilot exited $rc"
   fi
 }

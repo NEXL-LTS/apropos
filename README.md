@@ -25,7 +25,15 @@ macOS binary.
 - **Gemini CLI** — both Layer 2 and Layer 3 delivered via its `AfterTool` hook (its `BeforeTool` event
   can't inject context, so Layer 2 lands right after the edit rather than before it), `AGENTS.md` via
   `context.fileName`, and generated `.gemini/skills/*/SKILL.md` wrappers.
-- **Codex**, **GitHub Copilot CLI**, and **Cursor CLI** — coming soon.
+- **GitHub Copilot CLI** — both Layer 2 and Layer 3 delivered via its `postToolUse` hook (its
+  `preToolUse` event can only allow/deny/modify a call, not inject context, so — like Gemini — Layer 2
+  lands right after the edit rather than before it), calling `agent-apropos hook pre`/`post` directly —
+  no bridge script — since the binary understands Copilot's own wire dialect (`toolArgs` as a
+  JSON-encoded string) and replies in its flat `additionalContext` shape natively. Wired via a
+  generated `.github/hooks/agent-apropos.json`; `AGENTS.md` is read automatically. Repo-level hooks
+  require a trusted folder, and non-interactive `copilot -p` runs need
+  `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true` set for hooks to fire at all.
+- **Codex** and **Cursor CLI** — coming soon.
 
 ## Install
 
@@ -78,10 +86,14 @@ as well); if `gemini` is on PATH it wires both `agent-apropos hook pre` and
 `agent-apropos hook post` into `.gemini/settings.json`'s `AfterTool` event (Gemini's
 `BeforeTool` event has no way to inject context back into the model, so Layer
 2 degrades to firing right after the edit) and points `context.fileName` at
-`AGENTS.md`. Pass `--tool claude` / `--tool opencode` / `--tool gemini`
-(repeatable) to wire specific agents explicitly regardless of PATH. You never
-run the hooks themselves by hand — the agent calls them, and they inject the
-matching conventions as context.
+`AGENTS.md`; if `copilot` is on PATH it wires the same two commands into
+`.github/hooks/agent-apropos.json`'s `postToolUse` event, for the identical
+reason Gemini's does (Copilot's `preToolUse` event can't inject context
+either) — no bridge script, since the binary speaks Copilot's own wire
+dialect natively. Pass `--tool claude` / `--tool opencode` / `--tool gemini` /
+`--tool copilot` (repeatable) to wire specific agents explicitly regardless of
+PATH. You never run the hooks themselves by hand — the agent calls them, and
+they inject the matching conventions as context.
 
 Run `agent-apropos help` for the full mental model (also `agent-apropos help --format json` for
 the machine-readable form, or `agent-apropos help <command>`).

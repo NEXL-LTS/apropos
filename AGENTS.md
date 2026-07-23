@@ -20,6 +20,13 @@ even where the global Crystal cache is not writable.
 - `make check` — lint + spec (the fast local gate)
 - `make coverage` — run specs under kcov and enforce the 100% line-coverage gate
 - `make mutate SUBJECT=src/agent_apropos/<module>.cr` — advisory mutation testing (see `docs/mutation-testing.md`)
+- `make e2e` (or `bash e2e/run.sh`) — the **live** end-to-end suite: this is what "e2e tests" means
+  in this repo. A bats suite (`e2e/tests/`) that runs real, authenticated CLI agents (Claude Code,
+  OpenCode, and GitHub Copilot CLI by default; Gemini is opt-in via `E2E_GEMINI=1`) against a sample
+  repo (`e2e/project/`) and asserts the model's own output is actually steered by a wired convention.
+  Local/opt-in only — not part of `make check` or CI, since it needs live credentials. Read
+  `e2e/README.md` before touching it. Don't confuse it with `spec/integration/` (deterministic,
+  subprocess-level, runs in `make spec`).
 
 ## Universal rules
 
@@ -29,6 +36,10 @@ even where the global Crystal cache is not writable.
 - `generate` output must be byte-stable across runs and platforms (sorted walks, LF endings, no timestamps). Determinism is a prerequisite for the `--check` drift gate.
 - Do not put anything in this file that a linter or formatter can enforce — that belongs in tooling. Formatting is enforced by `crystal tool format`; do not document style here.
 - Write Windows-aware path code (use `Path`, never hardcode `/`), even though the Windows binary ships later.
+
+## Pull requests
+
+Keep PR descriptions simple and high-level — a short Summary only. Do not include a Test plan / checklist section.
 
 ## Where scoped guidance lives
 

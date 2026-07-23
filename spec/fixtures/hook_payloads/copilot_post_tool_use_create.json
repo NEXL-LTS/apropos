@@ -1,0 +1,11 @@
+{
+  "sessionId": "abc123",
+  "timestamp": 1784811086797,
+  "cwd": "/repo",
+  "toolName": "create",
+  "toolArgs": "{\"path\":\"/repo/db/migrate/001_create.cr\",\"file_text\":\"class Create\\n  def up\\n    transaction do\\n    end\\n  end\\nend\\n\"}",
+  "toolResult": {
+    "resultType": "success",
+    "textResultForLlm": "Created file /repo/db/migrate/001_create.cr with 64 characters"
+  }
+}
