@@ -1,0 +1,36 @@
+{
+  "hooks": {
+    "AfterTool": [
+      {
+        "matcher": "write_file|replace",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "apropos hook pre",
+            "timeout": 10000
+          },
+          {
+            "type": "command",
+            "command": "apropos hook post",
+            "timeout": 10000
+          }
+        ]
+      },
+      {
+        "matcher": "read_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "apropos hook pre",
+            "timeout": 10000
+          }
+        ]
+      }
+    ]
+  },
+  "context": {
+    "fileName": [
+      "AGENTS.md"
+    ]
+  }
+}
