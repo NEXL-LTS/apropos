@@ -37,6 +37,10 @@ even where the global Crystal cache is not writable.
 - Do not put anything in this file that a linter or formatter can enforce — that belongs in tooling. Formatting is enforced by `crystal tool format`; do not document style here.
 - Write Windows-aware path code (use `Path`, never hardcode `/`), even though the Windows binary ships later.
 
+## Pull requests
+
+Keep PR descriptions simple and high-level — a short Summary only. Do not include a Test plan / checklist section.
+
 ## Where scoped guidance lives
 
 Task- and file-scoped conventions are **not** in this file. They live in
