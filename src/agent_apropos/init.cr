@@ -12,8 +12,9 @@ module AgentApropos
   # prints what would change and writes nothing.
   #
   # Per-tool hook wiring (Claude Code's `.claude/settings.json`, OpenCode's
-  # generated plugin, Gemini CLI's `.gemini/settings.json`) is tool-agnostic:
-  # pass `--tool claude` / `--tool opencode` / `--tool gemini` (repeatable) to
+  # generated plugin, Gemini CLI's `.gemini/settings.json`, GitHub Copilot
+  # CLI's `.github/hooks/*.json`) is tool-agnostic: pass `--tool claude` /
+  # `--tool opencode` / `--tool gemini` / `--tool copilot` (repeatable) to
   # wire specific agents explicitly, or omit `--tool` entirely to auto-detect
   # by probing PATH for each supported agent. This keeps init easy to extend as
   # more agents (Codex, ...) land.
@@ -25,6 +26,11 @@ module AgentApropos
   # after the edit instead of before it — the same timing degradation
   # `doctor.cr` already documents for older Claude Code versions.
   #
+  # GitHub Copilot CLI has the identical limitation on its own `preToolUse`
+  # event (output schema is `permissionDecision`/`modifiedArgs` only — no
+  # context field), so it gets the same treatment onto `postToolUse` — see
+  # `scaffold_copilot`.
+  #
   # init is an authoring command, so it fails **closed**: a malformed existing
   # `settings.json` is an error, not a silent overwrite.
   module Init
@@ -34,8 +40,8 @@ module AgentApropos
     end
 
     # CLI agents init knows how to wire hooks for. Extend this set as more
-    # emitters land (Codex, GitHub Copilot CLI, Cursor CLI, ...).
-    KNOWN_TOOLS = Set{"claude", "opencode", "gemini"}
+    # emitters land (Codex, Cursor CLI, ...).
+    KNOWN_TOOLS = Set{"claude", "opencode", "gemini", "copilot"}
 
     # The context filename agent-apropos points Gemini CLI at, so Layer 1 reads the
     # same root file Claude Code and OpenCode do without needing a symlink.
@@ -75,6 +81,7 @@ module AgentApropos
       link_claude(repo_root, fs, options, stdout) if options.claude_symlink
       scaffold_opencode(repo_root, fs, options, stdout) if tools.includes?("opencode")
       merge_gemini_settings(repo_root, fs, options, stdout) if tools.includes?("gemini")
+      scaffold_copilot(repo_root, fs, options, stdout) if tools.includes?("copilot")
       stdout.puts NEXT_STEPS_HINT unless options.dry_run
       0
     rescue ex : AgentApropos::Error
@@ -501,6 +508,152 @@ module AgentApropos
       })
     end
 
+    # Write (or update) `.github/hooks/agent-apropos.json` and the companion
+    # `.github/hooks/agent-apropos-bridge.cjs` it invokes. Unlike Claude/Gemini's
+    # single shared settings file, Copilot CLI loads every `.github/hooks/*.json`
+    # in the repo independently, so these two files are entirely agent-apropos-owned —
+    # a plain `sync` of each, no foreign-key-preserving merge needed (matching
+    # `scaffold_opencode`'s single-owned-file precedent).
+    #
+    # Copilot's `preToolUse` output schema is `permissionDecision`/`modifiedArgs`
+    # only (no context field), so — as with Gemini's `AfterTool` — both Layer 2
+    # and Layer 3 are wired onto `postToolUse` instead, matched the same way
+    # Gemini's are: a `view`-only group carrying just `agent-apropos hook pre`,
+    # and a `create|edit` group carrying both. Field names below (`toolName`,
+    # `toolArgs` as a JSON-encoded *string*, `path`/`file_text`/`old_str`/
+    # `new_str`) come from a captured real Copilot CLI hook payload, not
+    # upstream docs — its own reference types `toolArgs` as `unknown`.
+    private def scaffold_copilot(repo_root : Path, fs : Filesystem, options : Options, stdout : IO) : Nil
+      hooks_path = repo_root.join(".github", "hooks", "agent-apropos.json").to_s
+      existing_hooks = fs.read?(hooks_path)
+      sync(fs, options, stdout, hooks_path, COPILOT_HOOKS_JSON, existing_hooks, ".github/hooks/agent-apropos.json")
+
+      bridge_path = repo_root.join(".github", "hooks", "agent-apropos-bridge.cjs").to_s
+      existing_bridge = fs.read?(bridge_path)
+      sync(fs, options, stdout, bridge_path, COPILOT_BRIDGE_CJS, existing_bridge, ".github/hooks/agent-apropos-bridge.cjs")
+    end
+
+    # Copilot CLI's own hook `timeout` field (`timeoutSec`) is seconds, like
+    # Claude Code's.
+    COPILOT_HOOK_TIMEOUT = 10
+
+    COPILOT_HOOKS_JSON = <<-JSON
+      {
+        "version": 1,
+        "hooks": {
+          "postToolUse": [
+            {
+              "type": "command",
+              "matcher": "view",
+              "command": "node .github/hooks/agent-apropos-bridge.cjs pre",
+              "timeoutSec": #{COPILOT_HOOK_TIMEOUT}
+            },
+            {
+              "type": "command",
+              "matcher": "create|edit",
+              "command": "node .github/hooks/agent-apropos-bridge.cjs pre",
+              "timeoutSec": #{COPILOT_HOOK_TIMEOUT}
+            },
+            {
+              "type": "command",
+              "matcher": "create|edit",
+              "command": "node .github/hooks/agent-apropos-bridge.cjs post",
+              "timeoutSec": #{COPILOT_HOOK_TIMEOUT}
+            }
+          ]
+        }
+      }
+      JSON
+
+    # Generated by `agent-apropos init --tool copilot` — reshapes Copilot CLI's
+    # postToolUse payload into the session_id/tool_input/file_path shape
+    # `agent-apropos hook pre`/`post` expect (Claude Code's own wire format, which
+    # every other wired agent's payload already happens to reuse) and reshapes
+    # the reply back into Copilot's `{ additionalContext }` shape. Fails open:
+    # any error here produces no output and never blocks a tool call, same
+    # guarantee `hook.cr` gives every other caller.
+    COPILOT_BRIDGE_CJS = <<-JS
+      // Generated by `agent-apropos init --tool copilot` — do not edit. Re-run to regenerate.
+      //
+      // Bridges GitHub Copilot CLI's postToolUse hook into `agent-apropos hook pre`/`post`.
+      // Copilot's preToolUse output schema can only allow/deny/modify a tool call — it
+      // has no field for injecting context — so both Layer 2 (path-scoped) and Layer 3
+      // (construct-scoped) run here instead, matched by the hook config that invokes
+      // this script (see docs/conventions/README.md for the layer model).
+      //
+      // Copilot's wire format differs from what agent-apropos hook pre/post expects:
+      // toolArgs arrives as a JSON-encoded STRING, keyed by path/file_text/old_str/
+      // new_str rather than file_path/content/new_string. This reshapes one into
+      // the other, and reshapes the reply back into Copilot's additionalContext shape.
+      //
+      // Fails open: any error produces no output and never blocks a tool call.
+
+      const { spawnSync } = require("node:child_process")
+
+      const WRITE_TOOLS = ["create", "edit"]
+      const READ_TOOLS = ["view"]
+
+      function readStdin() {
+        return new Promise((resolve) => {
+          const chunks = []
+          process.stdin.on("data", (chunk) => chunks.push(chunk))
+          process.stdin.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")))
+          process.stdin.on("error", () => resolve(""))
+        })
+      }
+
+      async function main() {
+        const sub = process.argv[2]
+        if (sub !== "pre" && sub !== "post") return
+
+        let event
+        try {
+          event = JSON.parse(await readStdin())
+        } catch {
+          return
+        }
+
+        const toolName = event.toolName
+        const known = WRITE_TOOLS.includes(toolName) || READ_TOOLS.includes(toolName)
+        if (!known || (sub === "post" && !WRITE_TOOLS.includes(toolName))) return
+
+        let args
+        try {
+          args = JSON.parse(event.toolArgs)
+        } catch {
+          return
+        }
+        if (!args.path) return
+
+        const payload = {
+          session_id: event.sessionId,
+          cwd: event.cwd,
+          tool_input: {
+            file_path: args.path,
+            content: args.file_text,
+            new_string: args.new_str,
+          },
+        }
+
+        const result = spawnSync("agent-apropos", ["hook", sub], {
+          input: JSON.stringify(payload),
+          encoding: "utf8",
+        })
+        if (result.status !== 0 || !result.stdout) return
+
+        let parsed
+        try {
+          parsed = JSON.parse(result.stdout)
+        } catch {
+          return
+        }
+        const context = parsed?.hookSpecificOutput?.additionalContext
+        if (context) process.stdout.write(JSON.stringify({ additionalContext: context }))
+      }
+
+      main()
+      JS
+
     # Alias CLAUDE.md → AGENTS.md so the same Layer 1 file serves both loaders.
     # Absent-only: an existing CLAUDE.md (real file or link) is left untouched.
     private def link_claude(repo_root : Path, fs : Filesystem, options : Options, stdout : IO) : Nil
@@ -560,10 +713,12 @@ module AgentApropos
       Claude Code delivers Layer 2 via PreToolUse `additionalContext`; run
       `agent-apropos doctor` to verify the version. OpenCode delivers Layer 2 via
       `tool.execute.before` and Layer 3 via `tool.execute.after`, injecting
-      context with `noReply: true` through the generated plugin. Gemini CLI has
-      no pre-edit context-injection event, so both Layer 2 and Layer 3 deliver
-      via its `AfterTool` hook instead — Layer 2 still fires, just after the
-      edit rather than before it.
+      context with `noReply: true` through the generated plugin. Gemini CLI and
+      GitHub Copilot CLI both have no pre-edit context-injection event (Gemini's
+      `BeforeTool` and Copilot's `preToolUse` can only override arguments or
+      block/allow the call), so both Layer 2 and Layer 3 deliver via their
+      post-edit hook instead (`AfterTool` for Gemini, `postToolUse` for Copilot)
+      — Layer 2 still fires, just after the edit rather than before it.
       MD
 
     AGENTS_SKELETON = <<-MD

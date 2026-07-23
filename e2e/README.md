@@ -1,11 +1,12 @@
 # agent-apropos end-to-end test
 
 A [bats-core](https://github.com/bats-core/bats-core) suite that runs agent-apropos
-against live Claude Code and OpenCode by default (Gemini CLI is supported but
-opt-in — see [Options](#options) — since even a healthy Gemini call has been
-observed taking 30-60s, and a real edit-task prompt over 180s) and asserts
-what the model actually writes. It is organized **by layer**; each layer runs
-the same with-agent-apropos / without-agent-apropos contrast for every enabled CLI.
+against live Claude Code, OpenCode, and GitHub Copilot CLI by default (Gemini
+CLI is supported but opt-in — see [Options](#options) — since even a healthy
+call has been observed taking 30-60s, and a real edit-task prompt over 180s)
+and asserts what the model actually writes. It is organized **by layer**;
+each layer runs the same with-agent-apropos / without-agent-apropos contrast for
+every enabled CLI.
 
 ## Structure
 
@@ -63,19 +64,19 @@ make e2e          # or: bash e2e/run.sh
 ```
 
 **Authenticate with each CLI first.** The live tests need a working, logged-in
-`claude`, `opencode`, and `gemini` — see [CI-safety and credentials](#ci-safety-and-credentials)
+`claude`, `opencode`, `gemini`, and `copilot` — see [CI-safety and credentials](#ci-safety-and-credentials)
 below for how. Skip this and the corresponding live tests don't fail; they
 just skip cleanly, which can look like a pass at a glance.
 
 `bats` and its `bats-support`/`bats-assert` libraries ship in the devcontainer
 image (resolved via `BATS_LIB_PATH`), so nothing is fetched at run time.
 Before invoking `bats`, `run.sh` runs `agent-apropos init --tool claude --tool
-opencode --tool gemini` and `agent-apropos generate` against `project/` itself, so
-its hook wiring (`.claude/`, `.opencode/`, `.gemini/`) is always freshly
-generated rather than committed (see `project/.gitignore`) — that way the
-fixture is fully wired regardless of which agents happen to be installed on
-the machine running the suite. `run.sh` invokes `bats` on [`tests/`](./tests);
-extra flags pass through, e.g. `bash e2e/run.sh --filter 'Layer 2'`.
+opencode --tool gemini --tool copilot` and `agent-apropos generate` against `project/`
+itself, so its hook wiring (`.claude/`, `.opencode/`, `.gemini/`, `.github/hooks/`)
+is always freshly generated rather than committed (see `project/.gitignore`) —
+that way the fixture is fully wired regardless of which agents happen to be
+installed on the machine running the suite. `run.sh` invokes `bats` on
+[`tests/`](./tests); extra flags pass through, e.g. `bash e2e/run.sh --filter 'Layer 2'`.
 
 ## The two tests per layer, per agent
 
@@ -97,11 +98,11 @@ actually steered.
 
 ## CI-safety and credentials
 
-The live checks require the `claude` / `opencode` / `gemini` CLI and valid
-credentials. When one is absent or unauthenticated, its tests **skip
-cleanly** and the run still exits `0`; the deterministic checks always run.
-This is why the e2e is not wired into `make check` or CI — it is a local,
-opt-in confidence check.
+The live checks require the `claude` / `opencode` / `gemini` / `copilot` CLI
+and valid credentials. When one is absent or unauthenticated, its tests
+**skip cleanly** and the run still exits `0`; the deterministic checks always
+run. This is why the e2e is not wired into `make check` or CI — it is a
+local, opt-in confidence check.
 
 In the devcontainer, Claude's credentials arrive via the `${HOME}/.claude.json`
 bind mount. OpenCode's credential lives in a named volume (`opencode-data`), so
@@ -118,6 +119,24 @@ bind-mounted as the `gemini-data` volume — run `gemini` once in the container
 and complete its browser OAuth flow on first prompt; it then persists across
 rebuilds the same way.
 
+GitHub Copilot CLI keeps its credential under `~/.copilot` — run `copilot`
+once and complete `/login`. A stray `GH_TOKEN` in the environment (common in
+devcontainers/CI, exported for other tooling) shadows that stored credential
+and makes every call fail authentication even when `copilot` itself is
+logged in; `run_copilot`/`require_live_copilot` (`helpers.bash`) already
+unset it for every invocation they make, so this is only a concern if you
+invoke `copilot` yourself outside the suite to debug.
+
+**Copilot CLI caveat:** its own `preToolUse` event can't inject context (only
+`postToolUse` can), so its Layer 2 lands right after the edit rather than
+before it — see the root README's Supported CLI agents section. More
+importantly, **Layer 4 is not implemented for Copilot** (agent-apropos has no
+skill-delivery mechanism for it yet): the "Layer 4 ... (Copilot)" pair still
+runs, but its "with" pass is a false positive, confirmed by disabling
+`.github/hooks` entirely and observing Copilot still produce the expected
+artifact purely by exploring the sample's tree on its own. Don't treat that
+one pair as evidence of anything until real Copilot skill delivery exists.
+
 ## Options
 
 - `E2E_GEMINI=1` — include Gemini CLI in the live matrix. Off by default:
@@ -127,7 +146,8 @@ rebuilds the same way.
   `run_gemini` (`helpers.bash`) remain fully working — set this when you
   deliberately want Gemini coverage.
 - `E2E_MODEL=<model>` — pass a specific model to `claude -p --model` /
-  `opencode run --model` / `gemini -p --model` (default: each CLI's configured
-  model). Use a small model (e.g. `E2E_MODEL=claude-haiku-4-5`) for cheaper runs.
+  `opencode run --model` / `gemini -p --model` / `copilot -p --model`
+  (default: each CLI's configured model). Use a small model (e.g.
+  `E2E_MODEL=claude-haiku-4-5`) for cheaper runs.
 - `bash e2e/run.sh --no-tempdir-cleanup` — keep the per-test temp dirs for
   inspection.

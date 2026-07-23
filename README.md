@@ -25,7 +25,13 @@ macOS binary.
 - **Gemini CLI** — both Layer 2 and Layer 3 delivered via its `AfterTool` hook (its `BeforeTool` event
   can't inject context, so Layer 2 lands right after the edit rather than before it), `AGENTS.md` via
   `context.fileName`, and generated `.gemini/skills/*/SKILL.md` wrappers.
-- **Codex**, **GitHub Copilot CLI**, and **Cursor CLI** — coming soon.
+- **GitHub Copilot CLI** — both Layer 2 and Layer 3 delivered via its `postToolUse` hook (its
+  `preToolUse` event can only allow/deny/modify a call, not inject context, so — like Gemini — Layer 2
+  lands right after the edit rather than before it), via a generated `.github/hooks/agent-apropos.json` +
+  bridge script, and `AGENTS.md` read automatically. Repo-level hooks require a trusted folder, and
+  non-interactive `copilot -p` runs need `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true` set for hooks to
+  fire at all.
+- **Codex** and **Cursor CLI** — coming soon.
 
 ## Install
 
